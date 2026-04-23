@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Plus, Filter, Calendar } from "lucide-react";
 import { format } from "date-fns";
+import { NewTaskDialog } from "@/components/dialogs/create-dialogs";
 
 export default function Tasks() {
   const { data: tasks, isLoading } = useListTasks();
@@ -29,9 +30,13 @@ export default function Tasks() {
           <h1 className="text-3xl font-bold tracking-tight">Tasks</h1>
           <p className="text-muted-foreground">Cross-project task management.</p>
         </div>
-        <Button className="shrink-0 gap-2">
-          <Plus className="h-4 w-4" /> New Task
-        </Button>
+        <NewTaskDialog
+          trigger={
+            <Button className="shrink-0 gap-2">
+              <Plus className="h-4 w-4" /> New Task
+            </Button>
+          }
+        />
       </div>
 
       <div className="flex items-center gap-2">

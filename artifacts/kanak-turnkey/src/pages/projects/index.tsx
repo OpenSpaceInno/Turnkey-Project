@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Plus, Search, Filter, MapPin, Calendar } from "lucide-react";
 import { format } from "date-fns";
+import { NewProjectDialog } from "@/components/dialogs/create-dialogs";
 
 export default function Projects() {
   const { data: projects, isLoading } = useListProjects();
@@ -29,9 +30,13 @@ export default function Projects() {
           <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
           <p className="text-muted-foreground">Manage active construction and EPC projects.</p>
         </div>
-        <Button className="shrink-0 gap-2">
-          <Plus className="h-4 w-4" /> New Project
-        </Button>
+        <NewProjectDialog
+          trigger={
+            <Button className="shrink-0 gap-2">
+              <Plus className="h-4 w-4" /> New Project
+            </Button>
+          }
+        />
       </div>
 
       <div className="flex items-center gap-2">

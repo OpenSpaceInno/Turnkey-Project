@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Filter } from "lucide-react";
 import { format } from "date-fns";
+import { NewLeadDialog } from "@/components/dialogs/create-dialogs";
 
 export default function Leads() {
   const { data: leads, isLoading: isLoadingLeads } = useListLeads();
@@ -29,9 +30,13 @@ export default function Leads() {
           <h1 className="text-3xl font-bold tracking-tight">Leads</h1>
           <p className="text-muted-foreground">Manage your sales pipeline and site visits.</p>
         </div>
-        <Button className="shrink-0 gap-2">
-          <Plus className="h-4 w-4" /> New Lead
-        </Button>
+        <NewLeadDialog
+          trigger={
+            <Button className="shrink-0 gap-2">
+              <Plus className="h-4 w-4" /> New Lead
+            </Button>
+          }
+        />
       </div>
 
       {summary && (
