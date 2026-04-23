@@ -1,27 +1,34 @@
-# Workspace
+# Kanak Turnkey Projects
 
-## Overview
+A comprehensive Turnkey Project Management System for an Indian construction/EPC company. Covers the full operations lifecycle: sales pipeline (leads, BOQ, drawings, site visits, negotiations), project execution (projects, tasks, budgets, RA bills), finance (expenses, client invoices, vendor invoices with 3-way match, EMD/BG/Retention instruments), procurement (vendors, MR, RFQ with quotation comparison, PO, inventory), stakeholders, communications, meetings, documents, dashboard, role-based access, notifications, and audit logs.
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+## Architecture
 
-## Stack
+- **Monorepo** managed with pnpm
+- **API server** (Express 5 + Drizzle ORM + PostgreSQL) at `artifacts/api-server`
+- **Web app** (React + Vite + wouter + tanstack-query + shadcn/ui + framer-motion + recharts) at `artifacts/kanak-turnkey`
+- **OpenAPI contract** at `lib/api-spec/openapi.yaml`; codegen produces `@workspace/api-client-react` (React Query hooks) and `@workspace/api-zod` (zod schemas)
+- **DB schema** lives in a single barrel file `lib/db/src/schema/index.ts`
 
-- **Monorepo tool**: pnpm workspaces
-- **Node.js version**: 24
-- **Package manager**: pnpm
-- **TypeScript version**: 5.9
-- **API framework**: Express 5
-- **Database**: PostgreSQL + Drizzle ORM
-- **Validation**: Zod (`zod/v4`), `drizzle-zod`
-- **API codegen**: Orval (from OpenAPI spec)
-- **Build**: esbuild (CJS bundle)
+## Auth model
 
-## Key Commands
+Simple cached single-user session via `getCurrentUser()` in `artifacts/api-server/src/lib/session.ts`. Roles are seeded on the user and the active role can be switched via the topbar. No external auth provider.
 
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- `pnpm --filter @workspace/api-server run dev` — run API server locally
+## Theme
 
-See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
+"Industrial Slate & Amber" with Plus Jakarta Sans + Spline Sans Mono. CSS variables defined in `artifacts/kanak-turnkey/src/index.css`.
+
+## Conventions
+
+- Numeric DB columns return strings from Drizzle — coerced to numbers in routes via `numKeys()` in `artifacts/api-server/src/lib/transforms.ts`
+- Lead numbering: `LD-YYYYMMDD-XXXX` (count-based seq generated in `routes/leads.ts`)
+- BOQ totals (subtotal, taxTotal, marginTotal, grandTotal) recomputed on item add/delete via `recomputeBoq()`
+- Seed data is loaded automatically on first server start via `seedIfEmpty()` — only runs when the users table is empty
+
+## Codegen workflow
+
+```bash
+pnpm --filter @workspace/api-spec run codegen   # regenerates client + zod
+pnpm --filter @workspace/db run push            # pushes schema to PG
+pnpm -w exec tsc -b lib/db                      # rebuild types after schema changes
+```

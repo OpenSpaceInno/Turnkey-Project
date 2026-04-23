@@ -1,36 +1,1498 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Kanak Turnkey Projects API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
-    description: Health operations
+  - name: auth
+  - name: users
+  - name: leads
+  - name: lead-activities
+  - name: site-visits
+  - name: drawings
+  - name: boqs
+  - name: negotiations
+  - name: projects
+  - name: tasks
+  - name: budgets
+  - name: ra-bills
+  - name: expenses
+  - name: invoices
+  - name: vendor-invoices
+  - name: financial-instruments
+  - name: vendors
+  - name: material-requests
+  - name: rfqs
+  - name: purchase-orders
+  - name: materials
+  - name: stakeholders
+  - name: communications
+  - name: meetings
+  - name: documents
+  - name: notifications
+  - name: audit-logs
+  - name: dashboard
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
-      summary: Health check
-      description: Returns server health status
       responses:
         "200":
-          description: Healthy
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/HealthStatus"
+          description: ok
+          content: { application/json: { schema: { $ref: "#/components/schemas/HealthStatus" } } }
+
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      tags: [auth]
+      responses:
+        "200":
+          description: ok
+          content: { application/json: { schema: { $ref: "#/components/schemas/User" } } }
+  /auth/switch-role:
+    post:
+      operationId: switchRole
+      tags: [auth]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/SwitchRoleRequest" } } }
+      responses:
+        "200":
+          description: ok
+          content: { application/json: { schema: { $ref: "#/components/schemas/User" } } }
+
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      responses:
+        "200":
+          description: ok
+          content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/User" } } } }
+  /users/{id}/roles:
+    patch:
+      operationId: updateUserRoles
+      tags: [users]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/UpdateRolesRequest" } } }
+      responses:
+        "200":
+          description: ok
+          content: { application/json: { schema: { $ref: "#/components/schemas/User" } } }
+
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      responses:
+        "200":
+          description: ok
+          content: { application/json: { schema: { $ref: "#/components/schemas/DashboardSummary" } } }
+  /dashboard/activity:
+    get:
+      operationId: getRecentActivity
+      tags: [dashboard]
+      responses:
+        "200":
+          description: ok
+          content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/ActivityItem" } } } }
+
+  /leads:
+    get:
+      operationId: listLeads
+      tags: [leads]
+      responses:
+        "200": { description: ok, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Lead" } } } } }
+    post:
+      operationId: createLead
+      tags: [leads]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/LeadInput" } } } }
+      responses: { "201": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/Lead" } } } } }
+  /leads/{id}:
+    get:
+      operationId: getLead
+      tags: [leads]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/LeadDetail" } } } } }
+    patch:
+      operationId: updateLead
+      tags: [leads]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/LeadInput" } } } }
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/Lead" } } } } }
+    delete:
+      operationId: deleteLead
+      tags: [leads]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { "204": { description: ok } }
+  /leads/summary:
+    get:
+      operationId: getLeadsSummary
+      tags: [leads]
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/LeadsSummary" } } } } }
+
+  /leads/{leadId}/activities:
+    get:
+      operationId: listLeadActivities
+      tags: [lead-activities]
+      parameters: [{ name: leadId, in: path, required: true, schema: { type: integer } }]
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/LeadActivity" } } } } } }
+    post:
+      operationId: createLeadActivity
+      tags: [lead-activities]
+      parameters: [{ name: leadId, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/LeadActivityInput" } } } }
+      responses: { "201": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/LeadActivity" } } } } }
+
+  /leads/{leadId}/site-visits:
+    get:
+      operationId: listSiteVisits
+      tags: [site-visits]
+      parameters: [{ name: leadId, in: path, required: true, schema: { type: integer } }]
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/SiteVisit" } } } } } }
+    post:
+      operationId: createSiteVisit
+      tags: [site-visits]
+      parameters: [{ name: leadId, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/SiteVisitInput" } } } }
+      responses: { "201": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/SiteVisit" } } } } }
+  /site-visits/{id}:
+    patch:
+      operationId: updateSiteVisit
+      tags: [site-visits]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/SiteVisitInput" } } } }
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/SiteVisit" } } } } }
+
+  /leads/{leadId}/drawings:
+    get:
+      operationId: listDrawings
+      tags: [drawings]
+      parameters: [{ name: leadId, in: path, required: true, schema: { type: integer } }]
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Drawing" } } } } } }
+    post:
+      operationId: createDrawing
+      tags: [drawings]
+      parameters: [{ name: leadId, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/DrawingInput" } } } }
+      responses: { "201": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/Drawing" } } } } }
+  /drawings/{id}:
+    patch:
+      operationId: updateDrawing
+      tags: [drawings]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/DrawingUpdate" } } } }
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/Drawing" } } } } }
+
+  /leads/{leadId}/boqs:
+    get:
+      operationId: listBoqs
+      tags: [boqs]
+      parameters: [{ name: leadId, in: path, required: true, schema: { type: integer } }]
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Boq" } } } } } }
+    post:
+      operationId: createBoq
+      tags: [boqs]
+      parameters: [{ name: leadId, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/BoqInput" } } } }
+      responses: { "201": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/Boq" } } } } }
+  /boqs/{id}:
+    get:
+      operationId: getBoq
+      tags: [boqs]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/BoqDetail" } } } } }
+    patch:
+      operationId: updateBoq
+      tags: [boqs]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/BoqUpdate" } } } }
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/Boq" } } } } }
+  /boqs/{boqId}/items:
+    post:
+      operationId: addBoqItem
+      tags: [boqs]
+      parameters: [{ name: boqId, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/BoqItemInput" } } } }
+      responses: { "201": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/BoqItem" } } } } }
+  /boq-items/{id}:
+    delete:
+      operationId: deleteBoqItem
+      tags: [boqs]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { "204": { description: ok } }
+
+  /leads/{leadId}/negotiations:
+    get:
+      operationId: listNegotiations
+      tags: [negotiations]
+      parameters: [{ name: leadId, in: path, required: true, schema: { type: integer } }]
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Negotiation" } } } } } }
+    post:
+      operationId: createNegotiation
+      tags: [negotiations]
+      parameters: [{ name: leadId, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/NegotiationInput" } } } }
+      responses: { "201": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/Negotiation" } } } } }
+  /negotiations/{id}:
+    patch:
+      operationId: updateNegotiation
+      tags: [negotiations]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/NegotiationUpdate" } } } }
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/Negotiation" } } } } }
+
+  /projects:
+    get:
+      operationId: listProjects
+      tags: [projects]
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Project" } } } } } }
+    post:
+      operationId: createProject
+      tags: [projects]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ProjectInput" } } } }
+      responses: { "201": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/Project" } } } } }
+  /projects/{id}:
+    get:
+      operationId: getProject
+      tags: [projects]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/ProjectDetail" } } } } }
+    patch:
+      operationId: updateProject
+      tags: [projects]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ProjectInput" } } } }
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/Project" } } } } }
+    delete:
+      operationId: deleteProject
+      tags: [projects]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { "204": { description: ok } }
+
+  /tasks:
+    get:
+      operationId: listTasks
+      tags: [tasks]
+      parameters: [{ name: projectId, in: query, schema: { type: integer } }]
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Task" } } } } } }
+    post:
+      operationId: createTask
+      tags: [tasks]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/TaskInput" } } } }
+      responses: { "201": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/Task" } } } } }
+  /tasks/{id}:
+    patch:
+      operationId: updateTask
+      tags: [tasks]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/TaskInput" } } } }
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/Task" } } } } }
+    delete:
+      operationId: deleteTask
+      tags: [tasks]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { "204": { description: ok } }
+
+  /projects/{projectId}/budget:
+    get:
+      operationId: listBudgetItems
+      tags: [budgets]
+      parameters: [{ name: projectId, in: path, required: true, schema: { type: integer } }]
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/BudgetItem" } } } } } }
+    post:
+      operationId: createBudgetItem
+      tags: [budgets]
+      parameters: [{ name: projectId, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/BudgetItemInput" } } } }
+      responses: { "201": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/BudgetItem" } } } } }
+  /budget-items/{id}:
+    patch:
+      operationId: updateBudgetItem
+      tags: [budgets]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/BudgetItemInput" } } } }
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/BudgetItem" } } } } }
+
+  /ra-bills:
+    get:
+      operationId: listRaBills
+      tags: [ra-bills]
+      parameters: [{ name: projectId, in: query, schema: { type: integer } }]
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/RaBill" } } } } } }
+    post:
+      operationId: createRaBill
+      tags: [ra-bills]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/RaBillInput" } } } }
+      responses: { "201": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/RaBill" } } } } }
+  /ra-bills/{id}:
+    patch:
+      operationId: updateRaBill
+      tags: [ra-bills]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/RaBillUpdate" } } } }
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/RaBill" } } } } }
+
+  /expenses:
+    get:
+      operationId: listExpenses
+      tags: [expenses]
+      parameters: [{ name: projectId, in: query, schema: { type: integer } }]
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Expense" } } } } } }
+    post:
+      operationId: createExpense
+      tags: [expenses]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ExpenseInput" } } } }
+      responses: { "201": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/Expense" } } } } }
+  /expenses/{id}:
+    patch:
+      operationId: updateExpense
+      tags: [expenses]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ExpenseUpdate" } } } }
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/Expense" } } } } }
+
+  /invoices:
+    get:
+      operationId: listInvoices
+      tags: [invoices]
+      parameters: [{ name: projectId, in: query, schema: { type: integer } }]
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Invoice" } } } } } }
+    post:
+      operationId: createInvoice
+      tags: [invoices]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/InvoiceInput" } } } }
+      responses: { "201": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/Invoice" } } } } }
+  /invoices/{id}:
+    patch:
+      operationId: updateInvoice
+      tags: [invoices]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/InvoiceUpdate" } } } }
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/Invoice" } } } } }
+
+  /vendor-invoices:
+    get:
+      operationId: listVendorInvoices
+      tags: [vendor-invoices]
+      parameters: [{ name: projectId, in: query, schema: { type: integer } }]
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/VendorInvoice" } } } } } }
+    post:
+      operationId: createVendorInvoice
+      tags: [vendor-invoices]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/VendorInvoiceInput" } } } }
+      responses: { "201": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/VendorInvoice" } } } } }
+  /vendor-invoices/{id}:
+    patch:
+      operationId: updateVendorInvoice
+      tags: [vendor-invoices]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/VendorInvoiceUpdate" } } } }
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/VendorInvoice" } } } } }
+
+  /financial-instruments:
+    get:
+      operationId: listFinancialInstruments
+      tags: [financial-instruments]
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/FinancialInstrument" } } } } } }
+    post:
+      operationId: createFinancialInstrument
+      tags: [financial-instruments]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/FinancialInstrumentInput" } } } }
+      responses: { "201": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/FinancialInstrument" } } } } }
+  /financial-instruments/{id}:
+    patch:
+      operationId: updateFinancialInstrument
+      tags: [financial-instruments]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/FinancialInstrumentInput" } } } }
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/FinancialInstrument" } } } } }
+
+  /vendors:
+    get:
+      operationId: listVendors
+      tags: [vendors]
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Vendor" } } } } } }
+    post:
+      operationId: createVendor
+      tags: [vendors]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/VendorInput" } } } }
+      responses: { "201": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/Vendor" } } } } }
+  /vendors/{id}:
+    patch:
+      operationId: updateVendor
+      tags: [vendors]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/VendorInput" } } } }
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/Vendor" } } } } }
+
+  /material-requests:
+    get:
+      operationId: listMaterialRequests
+      tags: [material-requests]
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/MaterialRequest" } } } } } }
+    post:
+      operationId: createMaterialRequest
+      tags: [material-requests]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/MaterialRequestInput" } } } }
+      responses: { "201": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/MaterialRequest" } } } } }
+  /material-requests/{id}:
+    patch:
+      operationId: updateMaterialRequest
+      tags: [material-requests]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/MaterialRequestUpdate" } } } }
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/MaterialRequest" } } } } }
+
+  /rfqs:
+    get:
+      operationId: listRfqs
+      tags: [rfqs]
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Rfq" } } } } } }
+    post:
+      operationId: createRfq
+      tags: [rfqs]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/RfqInput" } } } }
+      responses: { "201": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/Rfq" } } } } }
+  /rfqs/{id}:
+    get:
+      operationId: getRfq
+      tags: [rfqs]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/RfqDetail" } } } } }
+    patch:
+      operationId: updateRfq
+      tags: [rfqs]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/RfqUpdate" } } } }
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/Rfq" } } } } }
+  /rfqs/{rfqId}/quotations:
+    post:
+      operationId: addQuotation
+      tags: [rfqs]
+      parameters: [{ name: rfqId, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/QuotationInput" } } } }
+      responses: { "201": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/Quotation" } } } } }
+  /quotations/{id}/select:
+    post:
+      operationId: selectQuotation
+      tags: [rfqs]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/Quotation" } } } } }
+
+  /purchase-orders:
+    get:
+      operationId: listPurchaseOrders
+      tags: [purchase-orders]
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/PurchaseOrder" } } } } } }
+    post:
+      operationId: createPurchaseOrder
+      tags: [purchase-orders]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/PurchaseOrderInput" } } } }
+      responses: { "201": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/PurchaseOrder" } } } } }
+  /purchase-orders/{id}:
+    patch:
+      operationId: updatePurchaseOrder
+      tags: [purchase-orders]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/PurchaseOrderUpdate" } } } }
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/PurchaseOrder" } } } } }
+
+  /materials:
+    get:
+      operationId: listMaterials
+      tags: [materials]
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Material" } } } } } }
+    post:
+      operationId: createMaterial
+      tags: [materials]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/MaterialInput" } } } }
+      responses: { "201": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/Material" } } } } }
+  /materials/{id}:
+    patch:
+      operationId: updateMaterial
+      tags: [materials]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/MaterialInput" } } } }
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/Material" } } } } }
+
+  /stakeholders:
+    get:
+      operationId: listStakeholders
+      tags: [stakeholders]
+      parameters: [{ name: projectId, in: query, schema: { type: integer } }]
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Stakeholder" } } } } } }
+    post:
+      operationId: createStakeholder
+      tags: [stakeholders]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/StakeholderInput" } } } }
+      responses: { "201": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/Stakeholder" } } } } }
+
+  /communications:
+    get:
+      operationId: listCommunications
+      tags: [communications]
+      parameters: [{ name: projectId, in: query, schema: { type: integer } }]
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Communication" } } } } } }
+    post:
+      operationId: createCommunication
+      tags: [communications]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/CommunicationInput" } } } }
+      responses: { "201": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/Communication" } } } } }
+
+  /meetings:
+    get:
+      operationId: listMeetings
+      tags: [meetings]
+      parameters: [{ name: projectId, in: query, schema: { type: integer } }]
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Meeting" } } } } } }
+    post:
+      operationId: createMeeting
+      tags: [meetings]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/MeetingInput" } } } }
+      responses: { "201": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/Meeting" } } } } }
+  /meetings/{id}:
+    patch:
+      operationId: updateMeeting
+      tags: [meetings]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/MeetingInput" } } } }
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/Meeting" } } } } }
+
+  /documents:
+    get:
+      operationId: listDocuments
+      tags: [documents]
+      parameters: [{ name: projectId, in: query, schema: { type: integer } }]
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Document" } } } } } }
+    post:
+      operationId: createDocument
+      tags: [documents]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/DocumentInput" } } } }
+      responses: { "201": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/Document" } } } } }
+
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Notification" } } } } } }
+  /notifications/{id}/read:
+    post:
+      operationId: markNotificationRead
+      tags: [notifications]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/Notification" } } } } }
+  /notifications/clear:
+    post:
+      operationId: clearNotifications
+      tags: [notifications]
+      responses: { "204": { description: ok } }
+
+  /audit-logs:
+    get:
+      operationId: listAuditLogs
+      tags: [audit-logs]
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/AuditLog" } } } } } }
+
 components:
   schemas:
     HealthStatus:
       type: object
-      properties:
-        status:
-          type: string
-      required:
-        - status
+      required: [status]
+      properties: { status: { type: string } }
 
+    User:
+      type: object
+      required: [id, email, name, roles]
+      properties:
+        id: { type: integer }
+        email: { type: string }
+        name: { type: string }
+        avatarUrl: { type: ["string", "null"] }
+        roles:
+          type: array
+          items: { type: string, enum: [admin, project_manager, engineer, accountant, procurement_officer, viewer] }
+        activeRole: { type: string, enum: [admin, project_manager, engineer, accountant, procurement_officer, viewer] }
+    SwitchRoleRequest:
+      type: object
+      required: [role]
+      properties:
+        role: { type: string, enum: [admin, project_manager, engineer, accountant, procurement_officer, viewer] }
+    UpdateRolesRequest:
+      type: object
+      required: [roles]
+      properties:
+        roles:
+          type: array
+          items: { type: string }
+
+    DashboardSummary:
+      type: object
+      required: [totals, projectsByStatus, tasksByStatus, financials, procurement, leadFunnel]
+      properties:
+        totals:
+          type: object
+          required: [projects, leads, tasks, vendors]
+          properties:
+            projects: { type: integer }
+            leads: { type: integer }
+            tasks: { type: integer }
+            vendors: { type: integer }
+        projectsByStatus:
+          type: array
+          items:
+            type: object
+            required: [status, count]
+            properties: { status: { type: string }, count: { type: integer } }
+        tasksByStatus:
+          type: array
+          items:
+            type: object
+            required: [status, count]
+            properties: { status: { type: string }, count: { type: integer } }
+        financials:
+          type: object
+          required: [totalBudget, totalExpenses, totalInvoiced, totalPaid, overdueInvoices]
+          properties:
+            totalBudget: { type: number }
+            totalExpenses: { type: number }
+            totalInvoiced: { type: number }
+            totalPaid: { type: number }
+            overdueInvoices: { type: integer }
+        procurement:
+          type: object
+          required: [activePos, pendingRequests, lowStockMaterials]
+          properties:
+            activePos: { type: integer }
+            pendingRequests: { type: integer }
+            lowStockMaterials: { type: integer }
+        leadFunnel:
+          type: array
+          items:
+            type: object
+            required: [stage, count, value]
+            properties:
+              stage: { type: string }
+              count: { type: integer }
+              value: { type: number }
+    ActivityItem:
+      type: object
+      required: [id, type, title, description, createdAt]
+      properties:
+        id: { type: integer }
+        type: { type: string }
+        title: { type: string }
+        description: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    Lead:
+      type: object
+      required: [id, leadNumber, customerName, status, stage, priority, createdAt]
+      properties:
+        id: { type: integer }
+        leadNumber: { type: string }
+        customerName: { type: string }
+        company: { type: ["string", "null"] }
+        contactEmail: { type: ["string", "null"] }
+        contactPhone: { type: ["string", "null"] }
+        projectType: { type: ["string", "null"] }
+        location: { type: ["string", "null"] }
+        budgetEstimate: { type: ["number", "null"] }
+        leadSource: { type: ["string", "null"] }
+        status: { type: string, enum: [new, contacted, qualified, lost, won] }
+        stage: { type: string, enum: [lead_creation, site_visit, drawings, boq, negotiation, finalization] }
+        priority: { type: string, enum: [urgent, high, medium, low] }
+        ownerId: { type: ["integer", "null"] }
+        ownerName: { type: ["string", "null"] }
+        expectedClosureDate: { type: ["string", "null"], format: date }
+        wonProjectId: { type: ["integer", "null"] }
+        notes: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+    LeadInput:
+      type: object
+      required: [customerName]
+      properties:
+        customerName: { type: string }
+        company: { type: ["string", "null"] }
+        contactEmail: { type: ["string", "null"] }
+        contactPhone: { type: ["string", "null"] }
+        projectType: { type: ["string", "null"] }
+        location: { type: ["string", "null"] }
+        budgetEstimate: { type: ["number", "null"] }
+        leadSource: { type: ["string", "null"] }
+        status: { type: ["string", "null"], enum: [new, contacted, qualified, lost, won, null] }
+        stage: { type: ["string", "null"], enum: [lead_creation, site_visit, drawings, boq, negotiation, finalization, null] }
+        priority: { type: ["string", "null"], enum: [urgent, high, medium, low, null] }
+        ownerId: { type: ["integer", "null"] }
+        expectedClosureDate: { type: ["string", "null"], format: date }
+        wonProjectId: { type: ["integer", "null"] }
+        notes: { type: ["string", "null"] }
+    LeadDetail:
+      allOf:
+        - $ref: "#/components/schemas/Lead"
+        - type: object
+          properties:
+            activities: { type: array, items: { $ref: "#/components/schemas/LeadActivity" } }
+            siteVisits: { type: array, items: { $ref: "#/components/schemas/SiteVisit" } }
+            drawings: { type: array, items: { $ref: "#/components/schemas/Drawing" } }
+            boqs: { type: array, items: { $ref: "#/components/schemas/Boq" } }
+            negotiations: { type: array, items: { $ref: "#/components/schemas/Negotiation" } }
+    LeadsSummary:
+      type: object
+      required: [totalLeads, pipelineValue, conversionRate, qualifiedLeads, byStage, byStatus]
+      properties:
+        totalLeads: { type: integer }
+        pipelineValue: { type: number }
+        conversionRate: { type: number }
+        qualifiedLeads: { type: integer }
+        byStage:
+          type: array
+          items:
+            type: object
+            required: [stage, count, value]
+            properties: { stage: { type: string }, count: { type: integer }, value: { type: number } }
+        byStatus:
+          type: array
+          items:
+            type: object
+            required: [status, count]
+            properties: { status: { type: string }, count: { type: integer } }
+
+    LeadActivity:
+      type: object
+      required: [id, leadId, activityType, title, createdAt]
+      properties:
+        id: { type: integer }
+        leadId: { type: integer }
+        activityType: { type: string }
+        title: { type: string }
+        description: { type: ["string", "null"] }
+        createdById: { type: ["integer", "null"] }
+        createdByName: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+    LeadActivityInput:
+      type: object
+      required: [activityType, title]
+      properties:
+        activityType: { type: string }
+        title: { type: string }
+        description: { type: ["string", "null"] }
+
+    SiteVisit:
+      type: object
+      required: [id, leadId, visitDate, status]
+      properties:
+        id: { type: integer }
+        leadId: { type: integer }
+        visitDate: { type: string, format: date }
+        visitTime: { type: ["string", "null"] }
+        engineerId: { type: ["integer", "null"] }
+        engineerName: { type: ["string", "null"] }
+        siteAddress: { type: ["string", "null"] }
+        latitude: { type: ["number", "null"] }
+        longitude: { type: ["number", "null"] }
+        measurements: { type: ["string", "null"] }
+        observations: { type: ["string", "null"] }
+        status: { type: string, enum: [pending, completed, rescheduled] }
+    SiteVisitInput:
+      type: object
+      required: [visitDate]
+      properties:
+        visitDate: { type: string, format: date }
+        visitTime: { type: ["string", "null"] }
+        engineerId: { type: ["integer", "null"] }
+        siteAddress: { type: ["string", "null"] }
+        latitude: { type: ["number", "null"] }
+        longitude: { type: ["number", "null"] }
+        measurements: { type: ["string", "null"] }
+        observations: { type: ["string", "null"] }
+        status: { type: ["string", "null"], enum: [pending, completed, rescheduled, null] }
+
+    Drawing:
+      type: object
+      required: [id, leadId, fileName, version, status, uploadedAt]
+      properties:
+        id: { type: integer }
+        leadId: { type: integer }
+        fileName: { type: string }
+        fileType: { type: ["string", "null"] }
+        fileSize: { type: ["integer", "null"] }
+        fileUrl: { type: ["string", "null"] }
+        version: { type: integer }
+        status: { type: string, enum: [draft, submitted, approved, rejected] }
+        reviewerComments: { type: ["string", "null"] }
+        uploadedById: { type: ["integer", "null"] }
+        uploadedByName: { type: ["string", "null"] }
+        reviewedById: { type: ["integer", "null"] }
+        uploadedAt: { type: string, format: date-time }
+    DrawingInput:
+      type: object
+      required: [fileName]
+      properties:
+        fileName: { type: string }
+        fileType: { type: ["string", "null"] }
+        fileSize: { type: ["integer", "null"] }
+        fileUrl: { type: ["string", "null"] }
+        version: { type: ["integer", "null"] }
+    DrawingUpdate:
+      type: object
+      properties:
+        status: { type: ["string", "null"], enum: [draft, submitted, approved, rejected, null] }
+        reviewerComments: { type: ["string", "null"] }
+
+    Boq:
+      type: object
+      required: [id, leadId, version, status, subtotal, taxTotal, marginTotal, grandTotal, createdAt]
+      properties:
+        id: { type: integer }
+        leadId: { type: integer }
+        version: { type: integer }
+        status: { type: string, enum: [draft, submitted, approved, rejected] }
+        subtotal: { type: number }
+        taxTotal: { type: number }
+        marginTotal: { type: number }
+        grandTotal: { type: number }
+        createdById: { type: ["integer", "null"] }
+        approvedById: { type: ["integer", "null"] }
+        createdAt: { type: string, format: date-time }
+    BoqInput:
+      type: object
+      properties:
+        version: { type: ["integer", "null"] }
+    BoqUpdate:
+      type: object
+      properties:
+        status: { type: ["string", "null"], enum: [draft, submitted, approved, rejected, null] }
+    BoqDetail:
+      allOf:
+        - $ref: "#/components/schemas/Boq"
+        - type: object
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/BoqItem" } }
+    BoqItem:
+      type: object
+      required: [id, boqId, itemName, quantity, unitPrice, taxPercent, marginPercent, totalPrice, sortOrder]
+      properties:
+        id: { type: integer }
+        boqId: { type: integer }
+        itemName: { type: string }
+        category: { type: ["string", "null"] }
+        quantity: { type: number }
+        unit: { type: ["string", "null"] }
+        unitPrice: { type: number }
+        taxPercent: { type: number }
+        marginPercent: { type: number }
+        totalPrice: { type: number }
+        sortOrder: { type: integer }
+    BoqItemInput:
+      type: object
+      required: [itemName, quantity, unitPrice]
+      properties:
+        itemName: { type: string }
+        category: { type: ["string", "null"] }
+        quantity: { type: number }
+        unit: { type: ["string", "null"] }
+        unitPrice: { type: number }
+        taxPercent: { type: ["number", "null"] }
+        marginPercent: { type: ["number", "null"] }
+        sortOrder: { type: ["integer", "null"] }
+
+    Negotiation:
+      type: object
+      required: [id, leadId, roundNumber, status, createdAt]
+      properties:
+        id: { type: integer }
+        leadId: { type: integer }
+        roundNumber: { type: integer }
+        revisedAmount: { type: ["number", "null"] }
+        discountPercent: { type: ["number", "null"] }
+        status: { type: string, enum: [pending, approved, rejected, countered] }
+        requiresApproval: { type: boolean }
+        notes: { type: ["string", "null"] }
+        createdById: { type: ["integer", "null"] }
+        approvedById: { type: ["integer", "null"] }
+        createdAt: { type: string, format: date-time }
+    NegotiationInput:
+      type: object
+      properties:
+        revisedAmount: { type: ["number", "null"] }
+        discountPercent: { type: ["number", "null"] }
+        notes: { type: ["string", "null"] }
+        requiresApproval: { type: ["boolean", "null"] }
+    NegotiationUpdate:
+      type: object
+      properties:
+        status: { type: ["string", "null"], enum: [pending, approved, rejected, countered, null] }
+        notes: { type: ["string", "null"] }
+
+    Project:
+      type: object
+      required: [id, name, status, progress, createdAt]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        type: { type: ["string", "null"] }
+        location: { type: ["string", "null"] }
+        clientName: { type: ["string", "null"] }
+        startDate: { type: ["string", "null"], format: date }
+        endDate: { type: ["string", "null"], format: date }
+        budget: { type: ["number", "null"] }
+        description: { type: ["string", "null"] }
+        status: { type: string, enum: [planning, in_progress, on_hold, completed] }
+        progress: { type: integer }
+        teamSize: { type: ["integer", "null"] }
+        createdById: { type: ["integer", "null"] }
+        createdAt: { type: string, format: date-time }
+    ProjectInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        type: { type: ["string", "null"] }
+        location: { type: ["string", "null"] }
+        clientName: { type: ["string", "null"] }
+        startDate: { type: ["string", "null"], format: date }
+        endDate: { type: ["string", "null"], format: date }
+        budget: { type: ["number", "null"] }
+        description: { type: ["string", "null"] }
+        status: { type: ["string", "null"], enum: [planning, in_progress, on_hold, completed, null] }
+        progress: { type: ["integer", "null"] }
+        teamSize: { type: ["integer", "null"] }
+    ProjectDetail:
+      allOf:
+        - $ref: "#/components/schemas/Project"
+        - type: object
+          properties:
+            tasks: { type: array, items: { $ref: "#/components/schemas/Task" } }
+            budgetItems: { type: array, items: { $ref: "#/components/schemas/BudgetItem" } }
+            stakeholders: { type: array, items: { $ref: "#/components/schemas/Stakeholder" } }
+
+    Task:
+      type: object
+      required: [id, projectId, title, status, priority, progress, createdAt]
+      properties:
+        id: { type: integer }
+        projectId: { type: integer }
+        title: { type: string }
+        description: { type: ["string", "null"] }
+        assignedToId: { type: ["integer", "null"] }
+        assignedToName: { type: ["string", "null"] }
+        startDate: { type: ["string", "null"], format: date }
+        endDate: { type: ["string", "null"], format: date }
+        priority: { type: string, enum: [high, medium, low] }
+        status: { type: string, enum: [todo, in_progress, in_review, completed] }
+        progress: { type: integer }
+        parentTaskId: { type: ["integer", "null"] }
+        createdById: { type: ["integer", "null"] }
+        createdAt: { type: string, format: date-time }
+    TaskInput:
+      type: object
+      required: [projectId, title]
+      properties:
+        projectId: { type: integer }
+        title: { type: string }
+        description: { type: ["string", "null"] }
+        assignedToId: { type: ["integer", "null"] }
+        startDate: { type: ["string", "null"], format: date }
+        endDate: { type: ["string", "null"], format: date }
+        priority: { type: ["string", "null"], enum: [high, medium, low, null] }
+        status: { type: ["string", "null"], enum: [todo, in_progress, in_review, completed, null] }
+        progress: { type: ["integer", "null"] }
+        parentTaskId: { type: ["integer", "null"] }
+
+    BudgetItem:
+      type: object
+      required: [id, projectId, costCode, description, budgeted, actual, committed]
+      properties:
+        id: { type: integer }
+        projectId: { type: integer }
+        costCode: { type: string }
+        description: { type: string }
+        budgeted: { type: number }
+        actual: { type: number }
+        committed: { type: number }
+    BudgetItemInput:
+      type: object
+      required: [costCode, description, budgeted]
+      properties:
+        costCode: { type: string }
+        description: { type: string }
+        budgeted: { type: number }
+        actual: { type: ["number", "null"] }
+        committed: { type: ["number", "null"] }
+
+    RaBill:
+      type: object
+      required: [id, projectId, billNumber, amount, status, createdAt]
+      properties:
+        id: { type: integer }
+        projectId: { type: integer }
+        projectName: { type: ["string", "null"] }
+        billNumber: { type: string }
+        description: { type: ["string", "null"] }
+        amount: { type: number }
+        milestone: { type: ["string", "null"] }
+        status: { type: string, enum: [draft, submitted, approved, rejected, invoiced] }
+        createdById: { type: ["integer", "null"] }
+        createdAt: { type: string, format: date-time }
+    RaBillInput:
+      type: object
+      required: [projectId, billNumber, amount]
+      properties:
+        projectId: { type: integer }
+        billNumber: { type: string }
+        description: { type: ["string", "null"] }
+        amount: { type: number }
+        milestone: { type: ["string", "null"] }
+    RaBillUpdate:
+      type: object
+      properties:
+        status: { type: ["string", "null"], enum: [draft, submitted, approved, rejected, invoiced, null] }
+        amount: { type: ["number", "null"] }
+        description: { type: ["string", "null"] }
+
+    Expense:
+      type: object
+      required: [id, projectId, description, amount, category, expenseDate, status]
+      properties:
+        id: { type: integer }
+        projectId: { type: integer }
+        projectName: { type: ["string", "null"] }
+        description: { type: string }
+        amount: { type: number }
+        category: { type: string, enum: [materials, labor, equipment, subcontractor, other] }
+        expenseDate: { type: string, format: date }
+        receiptUrl: { type: ["string", "null"] }
+        status: { type: string, enum: [draft, submitted, approved, rejected] }
+        submittedById: { type: ["integer", "null"] }
+        submittedByName: { type: ["string", "null"] }
+        approvedById: { type: ["integer", "null"] }
+    ExpenseInput:
+      type: object
+      required: [projectId, description, amount, category, expenseDate]
+      properties:
+        projectId: { type: integer }
+        description: { type: string }
+        amount: { type: number }
+        category: { type: string, enum: [materials, labor, equipment, subcontractor, other] }
+        expenseDate: { type: string, format: date }
+        receiptUrl: { type: ["string", "null"] }
+        status: { type: ["string", "null"], enum: [draft, submitted, approved, rejected, null] }
+    ExpenseUpdate:
+      type: object
+      properties:
+        status: { type: ["string", "null"], enum: [draft, submitted, approved, rejected, null] }
+
+    Invoice:
+      type: object
+      required: [id, projectId, invoiceNumber, clientName, amount, invoiceDate, dueDate, status]
+      properties:
+        id: { type: integer }
+        projectId: { type: integer }
+        projectName: { type: ["string", "null"] }
+        invoiceNumber: { type: string }
+        clientName: { type: string }
+        amount: { type: number }
+        invoiceDate: { type: string, format: date }
+        dueDate: { type: string, format: date }
+        paymentDate: { type: ["string", "null"], format: date }
+        reconciled: { type: boolean }
+        status: { type: string, enum: [draft, sent, paid, overdue] }
+    InvoiceInput:
+      type: object
+      required: [projectId, invoiceNumber, clientName, amount, invoiceDate, dueDate]
+      properties:
+        projectId: { type: integer }
+        invoiceNumber: { type: string }
+        clientName: { type: string }
+        amount: { type: number }
+        invoiceDate: { type: string, format: date }
+        dueDate: { type: string, format: date }
+    InvoiceUpdate:
+      type: object
+      properties:
+        status: { type: ["string", "null"], enum: [draft, sent, paid, overdue, null] }
+        paymentDate: { type: ["string", "null"], format: date }
+        reconciled: { type: ["boolean", "null"] }
+
+    VendorInvoice:
+      type: object
+      required: [id, projectId, vendorId, invoiceNumber, amount, status]
+      properties:
+        id: { type: integer }
+        projectId: { type: integer }
+        projectName: { type: ["string", "null"] }
+        vendorId: { type: integer }
+        vendorName: { type: ["string", "null"] }
+        purchaseOrderId: { type: ["integer", "null"] }
+        invoiceNumber: { type: string }
+        amount: { type: number }
+        discrepancyNotes: { type: ["string", "null"] }
+        status: { type: string, enum: [received, matched, discrepancy, approved, scheduled, paid] }
+        paymentDate: { type: ["string", "null"], format: date }
+    VendorInvoiceInput:
+      type: object
+      required: [projectId, vendorId, invoiceNumber, amount]
+      properties:
+        projectId: { type: integer }
+        vendorId: { type: integer }
+        purchaseOrderId: { type: ["integer", "null"] }
+        invoiceNumber: { type: string }
+        amount: { type: number }
+    VendorInvoiceUpdate:
+      type: object
+      properties:
+        status: { type: ["string", "null"], enum: [received, matched, discrepancy, approved, scheduled, paid, null] }
+        discrepancyNotes: { type: ["string", "null"] }
+        paymentDate: { type: ["string", "null"], format: date }
+
+    FinancialInstrument:
+      type: object
+      required: [id, instrumentType, amount, status, createdAt]
+      properties:
+        id: { type: integer }
+        projectId: { type: ["integer", "null"] }
+        projectName: { type: ["string", "null"] }
+        instrumentType: { type: string, enum: [emd, bank_guarantee, retention_dlp] }
+        bgSubType: { type: ["string", "null"], enum: [performance, advance_payment, bid_bond, null] }
+        amount: { type: number }
+        issueDate: { type: ["string", "null"], format: date }
+        expiryDate: { type: ["string", "null"], format: date }
+        releaseDate: { type: ["string", "null"], format: date }
+        bankName: { type: ["string", "null"] }
+        referenceNumber: { type: ["string", "null"] }
+        retentionPercent: { type: ["number", "null"] }
+        status: { type: string, enum: [active, released, expired, forfeited, overdue] }
+        notes: { type: ["string", "null"] }
+        createdById: { type: ["integer", "null"] }
+        createdAt: { type: string, format: date-time }
+    FinancialInstrumentInput:
+      type: object
+      required: [instrumentType, amount]
+      properties:
+        projectId: { type: ["integer", "null"] }
+        instrumentType: { type: string, enum: [emd, bank_guarantee, retention_dlp] }
+        bgSubType: { type: ["string", "null"], enum: [performance, advance_payment, bid_bond, null] }
+        amount: { type: number }
+        issueDate: { type: ["string", "null"], format: date }
+        expiryDate: { type: ["string", "null"], format: date }
+        releaseDate: { type: ["string", "null"], format: date }
+        bankName: { type: ["string", "null"] }
+        referenceNumber: { type: ["string", "null"] }
+        retentionPercent: { type: ["number", "null"] }
+        status: { type: ["string", "null"], enum: [active, released, expired, forfeited, overdue, null] }
+        notes: { type: ["string", "null"] }
+
+    Vendor:
+      type: object
+      required: [id, name, status, rating]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        contactPerson: { type: ["string", "null"] }
+        email: { type: ["string", "null"] }
+        phone: { type: ["string", "null"] }
+        address: { type: ["string", "null"] }
+        category: { type: ["string", "null"] }
+        rating: { type: number }
+        status: { type: string, enum: [active, inactive] }
+    VendorInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        contactPerson: { type: ["string", "null"] }
+        email: { type: ["string", "null"] }
+        phone: { type: ["string", "null"] }
+        address: { type: ["string", "null"] }
+        category: { type: ["string", "null"] }
+        rating: { type: ["number", "null"] }
+        status: { type: ["string", "null"], enum: [active, inactive, null] }
+
+    MaterialRequest:
+      type: object
+      required: [id, projectId, title, quantity, unit, status, createdAt]
+      properties:
+        id: { type: integer }
+        projectId: { type: integer }
+        projectName: { type: ["string", "null"] }
+        title: { type: string }
+        description: { type: ["string", "null"] }
+        quantity: { type: number }
+        unit: { type: string }
+        status: { type: string, enum: [pending, approved, rejected, rfq_sent, fulfilled] }
+        createdById: { type: ["integer", "null"] }
+        createdByName: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+    MaterialRequestInput:
+      type: object
+      required: [projectId, title, quantity, unit]
+      properties:
+        projectId: { type: integer }
+        title: { type: string }
+        description: { type: ["string", "null"] }
+        quantity: { type: number }
+        unit: { type: string }
+    MaterialRequestUpdate:
+      type: object
+      properties:
+        status: { type: ["string", "null"], enum: [pending, approved, rejected, rfq_sent, fulfilled, null] }
+
+    Rfq:
+      type: object
+      required: [id, projectId, title, status, createdAt]
+      properties:
+        id: { type: integer }
+        projectId: { type: integer }
+        projectName: { type: ["string", "null"] }
+        materialRequestId: { type: ["integer", "null"] }
+        title: { type: string }
+        description: { type: ["string", "null"] }
+        status: { type: string, enum: [draft, sent, quotes_received, awarded, cancelled] }
+        createdById: { type: ["integer", "null"] }
+        createdAt: { type: string, format: date-time }
+    RfqInput:
+      type: object
+      required: [projectId, title]
+      properties:
+        projectId: { type: integer }
+        materialRequestId: { type: ["integer", "null"] }
+        title: { type: string }
+        description: { type: ["string", "null"] }
+    RfqUpdate:
+      type: object
+      properties:
+        status: { type: ["string", "null"], enum: [draft, sent, quotes_received, awarded, cancelled, null] }
+        title: { type: ["string", "null"] }
+        description: { type: ["string", "null"] }
+    RfqDetail:
+      allOf:
+        - $ref: "#/components/schemas/Rfq"
+        - type: object
+          properties:
+            quotations: { type: array, items: { $ref: "#/components/schemas/Quotation" } }
+    Quotation:
+      type: object
+      required: [id, rfqId, vendorId, amount, deliveryDays, isSelected]
+      properties:
+        id: { type: integer }
+        rfqId: { type: integer }
+        vendorId: { type: integer }
+        vendorName: { type: ["string", "null"] }
+        amount: { type: number }
+        deliveryDays: { type: integer }
+        notes: { type: ["string", "null"] }
+        isSelected: { type: boolean }
+    QuotationInput:
+      type: object
+      required: [vendorId, amount, deliveryDays]
+      properties:
+        vendorId: { type: integer }
+        amount: { type: number }
+        deliveryDays: { type: integer }
+        notes: { type: ["string", "null"] }
+
+    PurchaseOrder:
+      type: object
+      required: [id, projectId, vendorId, poNumber, totalAmount, status, inspectionStatus, createdAt]
+      properties:
+        id: { type: integer }
+        projectId: { type: integer }
+        projectName: { type: ["string", "null"] }
+        vendorId: { type: integer }
+        vendorName: { type: ["string", "null"] }
+        poNumber: { type: string }
+        description: { type: ["string", "null"] }
+        totalAmount: { type: number }
+        deliveryDate: { type: ["string", "null"], format: date }
+        status: { type: string, enum: [draft, issued, acknowledged, in_transit, delivered, cancelled] }
+        inspectionStatus: { type: string, enum: [pending, passed, failed, na] }
+        createdById: { type: ["integer", "null"] }
+        createdAt: { type: string, format: date-time }
+    PurchaseOrderInput:
+      type: object
+      required: [projectId, vendorId, poNumber, totalAmount]
+      properties:
+        projectId: { type: integer }
+        vendorId: { type: integer }
+        poNumber: { type: string }
+        description: { type: ["string", "null"] }
+        totalAmount: { type: number }
+        deliveryDate: { type: ["string", "null"], format: date }
+    PurchaseOrderUpdate:
+      type: object
+      properties:
+        status: { type: ["string", "null"], enum: [draft, issued, acknowledged, in_transit, delivered, cancelled, null] }
+        inspectionStatus: { type: ["string", "null"], enum: [pending, passed, failed, na, null] }
+
+    Material:
+      type: object
+      required: [id, name, unit, quantityOnHand, quantityCommitted, quantityConsumed, minimumStock]
+      properties:
+        id: { type: integer }
+        projectId: { type: ["integer", "null"] }
+        projectName: { type: ["string", "null"] }
+        name: { type: string }
+        description: { type: ["string", "null"] }
+        unit: { type: string }
+        quantityOnHand: { type: number }
+        quantityCommitted: { type: number }
+        quantityConsumed: { type: number }
+        minimumStock: { type: number }
+    MaterialInput:
+      type: object
+      required: [name, unit]
+      properties:
+        projectId: { type: ["integer", "null"] }
+        name: { type: string }
+        description: { type: ["string", "null"] }
+        unit: { type: string }
+        quantityOnHand: { type: ["number", "null"] }
+        quantityCommitted: { type: ["number", "null"] }
+        quantityConsumed: { type: ["number", "null"] }
+        minimumStock: { type: ["number", "null"] }
+
+    Stakeholder:
+      type: object
+      required: [id, projectId, name, accessLevel]
+      properties:
+        id: { type: integer }
+        projectId: { type: integer }
+        projectName: { type: ["string", "null"] }
+        name: { type: string }
+        email: { type: ["string", "null"] }
+        phone: { type: ["string", "null"] }
+        organization: { type: ["string", "null"] }
+        role: { type: ["string", "null"] }
+        accessLevel: { type: string, enum: [read, write, admin] }
+    StakeholderInput:
+      type: object
+      required: [projectId, name]
+      properties:
+        projectId: { type: integer }
+        name: { type: string }
+        email: { type: ["string", "null"] }
+        phone: { type: ["string", "null"] }
+        organization: { type: ["string", "null"] }
+        role: { type: ["string", "null"] }
+        accessLevel: { type: ["string", "null"], enum: [read, write, admin, null] }
+
+    Communication:
+      type: object
+      required: [id, communicationType, subject, communicationDate, createdAt]
+      properties:
+        id: { type: integer }
+        projectId: { type: ["integer", "null"] }
+        projectName: { type: ["string", "null"] }
+        stakeholderId: { type: ["integer", "null"] }
+        communicationType: { type: string, enum: [email, phone, meeting, other] }
+        subject: { type: string }
+        content: { type: ["string", "null"] }
+        communicationDate: { type: string, format: date-time }
+        participants: { type: ["string", "null"] }
+        createdById: { type: ["integer", "null"] }
+        createdAt: { type: string, format: date-time }
+    CommunicationInput:
+      type: object
+      required: [communicationType, subject, communicationDate]
+      properties:
+        projectId: { type: ["integer", "null"] }
+        stakeholderId: { type: ["integer", "null"] }
+        communicationType: { type: string, enum: [email, phone, meeting, other] }
+        subject: { type: string }
+        content: { type: ["string", "null"] }
+        communicationDate: { type: string, format: date-time }
+        participants: { type: ["string", "null"] }
+
+    Meeting:
+      type: object
+      required: [id, projectId, title, meetingDate, duration, createdAt]
+      properties:
+        id: { type: integer }
+        projectId: { type: integer }
+        projectName: { type: ["string", "null"] }
+        title: { type: string }
+        meetingDate: { type: string, format: date-time }
+        duration: { type: integer }
+        location: { type: ["string", "null"] }
+        agenda: { type: ["string", "null"] }
+        minutes: { type: ["string", "null"] }
+        participants: { type: ["string", "null"] }
+        createdById: { type: ["integer", "null"] }
+        createdAt: { type: string, format: date-time }
+    MeetingInput:
+      type: object
+      required: [projectId, title, meetingDate]
+      properties:
+        projectId: { type: integer }
+        title: { type: string }
+        meetingDate: { type: string, format: date-time }
+        duration: { type: ["integer", "null"] }
+        location: { type: ["string", "null"] }
+        agenda: { type: ["string", "null"] }
+        minutes: { type: ["string", "null"] }
+        participants: { type: ["string", "null"] }
+
+    Document:
+      type: object
+      required: [id, projectId, fileName, category, version, status, uploadedAt]
+      properties:
+        id: { type: integer }
+        projectId: { type: integer }
+        projectName: { type: ["string", "null"] }
+        fileName: { type: string }
+        fileType: { type: ["string", "null"] }
+        fileSize: { type: ["integer", "null"] }
+        fileUrl: { type: ["string", "null"] }
+        category: { type: string, enum: [general, contract, drawing, report, other] }
+        version: { type: integer }
+        status: { type: string, enum: [draft, active, archived] }
+        uploadedById: { type: ["integer", "null"] }
+        uploadedByName: { type: ["string", "null"] }
+        uploadedAt: { type: string, format: date-time }
+    DocumentInput:
+      type: object
+      required: [projectId, fileName]
+      properties:
+        projectId: { type: integer }
+        fileName: { type: string }
+        fileType: { type: ["string", "null"] }
+        fileSize: { type: ["integer", "null"] }
+        fileUrl: { type: ["string", "null"] }
+        category: { type: ["string", "null"], enum: [general, contract, drawing, report, other, null] }
+        version: { type: ["integer", "null"] }
+        status: { type: ["string", "null"], enum: [draft, active, archived, null] }
+
+    Notification:
+      type: object
+      required: [id, notificationType, title, isRead, createdAt]
+      properties:
+        id: { type: integer }
+        notificationType: { type: string }
+        title: { type: string }
+        message: { type: ["string", "null"] }
+        isRead: { type: boolean }
+        createdAt: { type: string, format: date-time }
+
+    AuditLog:
+      type: object
+      required: [id, activity, resourceType, status, createdAt]
+      properties:
+        id: { type: integer }
+        userId: { type: ["integer", "null"] }
+        userName: { type: ["string", "null"] }
+        activity: { type: string }
+        resourceType: { type: string }
+        resourceId: { type: ["integer", "null"] }
+        ipAddress: { type: ["string", "null"] }
+        status: { type: string }
+        metadata: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }

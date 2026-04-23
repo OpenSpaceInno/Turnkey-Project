@@ -1,0 +1,329 @@
+import { Router, type IRouter } from "express";
+import { eq, desc, asc } from "drizzle-orm";
+import {
+  db,
+  projectsTable,
+  tasksTable,
+  budgetItemsTable,
+  raBillsTable,
+  stakeholdersTable,
+  usersTable,
+} from "@workspace/db";
+import { numKeys } from "../lib/transforms";
+import { getCurrentUser } from "../lib/session";
+
+const router: IRouter = Router();
+
+const fProj = (r: Record<string, unknown>) => numKeys(r, ["budget"]);
+const fBudget = (r: Record<string, unknown>) =>
+  numKeys(r, ["budgeted", "actual", "committed"]);
+const fRa = (r: Record<string, unknown>) => numKeys(r, ["amount"]);
+
+router.get("/projects", async (_req, res): Promise<void> => {
+  const rows = await db
+    .select()
+    .from(projectsTable)
+    .orderBy(desc(projectsTable.createdAt));
+  res.json(rows.map(fProj));
+});
+
+router.post("/projects", async (req, res): Promise<void> => {
+  const b = req.body ?? {};
+  if (!b.name) {
+    res.status(400).json({ error: "name required" });
+    return;
+  }
+  const me = await getCurrentUser();
+  const [p] = await db
+    .insert(projectsTable)
+    .values({
+      name: b.name,
+      type: b.type ?? null,
+      location: b.location ?? null,
+      clientName: b.clientName ?? null,
+      startDate: b.startDate ?? null,
+      endDate: b.endDate ?? null,
+      budget: b.budget != null ? String(b.budget) : null,
+      description: b.description ?? null,
+      status: b.status ?? "planning",
+      progress: b.progress ?? 0,
+      teamSize: b.teamSize ?? null,
+      createdById: me.id,
+    })
+    .returning();
+  res.status(201).json(fProj(p!));
+});
+
+router.get("/projects/:id", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id as string, 10);
+  const [p] = await db.select().from(projectsTable).where(eq(projectsTable.id, id));
+  if (!p) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  const tasks = await db
+    .select({ t: tasksTable, n: usersTable.name })
+    .from(tasksTable)
+    .leftJoin(usersTable, eq(usersTable.id, tasksTable.assignedToId))
+    .where(eq(tasksTable.projectId, id))
+    .orderBy(asc(tasksTable.id));
+  const budgetItems = await db
+    .select()
+    .from(budgetItemsTable)
+    .where(eq(budgetItemsTable.projectId, id));
+  const stakeholders = await db
+    .select()
+    .from(stakeholdersTable)
+    .where(eq(stakeholdersTable.projectId, id));
+  res.json({
+    ...fProj(p),
+    tasks: tasks.map((r) => ({ ...r.t, assignedToName: r.n })),
+    budgetItems: budgetItems.map(fBudget),
+    stakeholders,
+  });
+});
+
+router.patch("/projects/:id", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id as string, 10);
+  const b = req.body ?? {};
+  const update: Record<string, unknown> = {};
+  for (const k of [
+    "name",
+    "type",
+    "location",
+    "clientName",
+    "startDate",
+    "endDate",
+    "description",
+    "status",
+    "progress",
+    "teamSize",
+  ]) {
+    if (b[k] !== undefined) update[k] = b[k];
+  }
+  if (b.budget !== undefined)
+    update.budget = b.budget == null ? null : String(b.budget);
+  const [p] = await db
+    .update(projectsTable)
+    .set(update)
+    .where(eq(projectsTable.id, id))
+    .returning();
+  if (!p) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  res.json(fProj(p));
+});
+
+router.delete("/projects/:id", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id as string, 10);
+  await db.delete(projectsTable).where(eq(projectsTable.id, id));
+  res.sendStatus(204);
+});
+
+router.get("/tasks", async (req, res): Promise<void> => {
+  const projectId = req.query.projectId
+    ? parseInt(req.query.projectId as string, 10)
+    : null;
+  const baseQuery = db
+    .select({ t: tasksTable, n: usersTable.name, p: projectsTable.name })
+    .from(tasksTable)
+    .leftJoin(usersTable, eq(usersTable.id, tasksTable.assignedToId))
+    .leftJoin(projectsTable, eq(projectsTable.id, tasksTable.projectId));
+  const rows = projectId
+    ? await baseQuery.where(eq(tasksTable.projectId, projectId)).orderBy(desc(tasksTable.createdAt))
+    : await baseQuery.orderBy(desc(tasksTable.createdAt));
+  res.json(rows.map((r) => ({ ...r.t, assignedToName: r.n, projectName: r.p })));
+});
+
+router.post("/tasks", async (req, res): Promise<void> => {
+  const b = req.body ?? {};
+  if (!b.projectId || !b.title) {
+    res.status(400).json({ error: "projectId and title required" });
+    return;
+  }
+  const me = await getCurrentUser();
+  const [t] = await db
+    .insert(tasksTable)
+    .values({
+      projectId: b.projectId,
+      title: b.title,
+      description: b.description ?? null,
+      assignedToId: b.assignedToId ?? null,
+      startDate: b.startDate ?? null,
+      endDate: b.endDate ?? null,
+      priority: b.priority ?? "medium",
+      status: b.status ?? "todo",
+      progress: b.progress ?? 0,
+      parentTaskId: b.parentTaskId ?? null,
+      createdById: me.id,
+    })
+    .returning();
+  res.status(201).json(t);
+});
+
+router.patch("/tasks/:id", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id as string, 10);
+  const b = req.body ?? {};
+  const update: Record<string, unknown> = {};
+  for (const k of [
+    "projectId",
+    "title",
+    "description",
+    "assignedToId",
+    "startDate",
+    "endDate",
+    "priority",
+    "status",
+    "progress",
+    "parentTaskId",
+  ]) {
+    if (b[k] !== undefined) update[k] = b[k];
+  }
+  const [t] = await db
+    .update(tasksTable)
+    .set(update)
+    .where(eq(tasksTable.id, id))
+    .returning();
+  if (!t) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  res.json(t);
+});
+
+router.delete("/tasks/:id", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id as string, 10);
+  await db.delete(tasksTable).where(eq(tasksTable.id, id));
+  res.sendStatus(204);
+});
+
+router.get("/projects/:projectId/budget", async (req, res): Promise<void> => {
+  const pid = parseInt(req.params.projectId as string, 10);
+  const rows = await db
+    .select()
+    .from(budgetItemsTable)
+    .where(eq(budgetItemsTable.projectId, pid));
+  res.json(rows.map(fBudget));
+});
+
+router.post("/projects/:projectId/budget", async (req, res): Promise<void> => {
+  const pid = parseInt(req.params.projectId as string, 10);
+  const b = req.body ?? {};
+  const [item] = await db
+    .insert(budgetItemsTable)
+    .values({
+      projectId: pid,
+      costCode: b.costCode,
+      description: b.description,
+      budgeted: String(b.budgeted ?? 0),
+      actual: String(b.actual ?? 0),
+      committed: String(b.committed ?? 0),
+    })
+    .returning();
+  res.status(201).json(fBudget(item!));
+});
+
+router.patch("/budget-items/:id", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id as string, 10);
+  const b = req.body ?? {};
+  const update: Record<string, unknown> = {};
+  if (b.costCode !== undefined) update.costCode = b.costCode;
+  if (b.description !== undefined) update.description = b.description;
+  if (b.budgeted !== undefined) update.budgeted = String(b.budgeted);
+  if (b.actual !== undefined) update.actual = String(b.actual);
+  if (b.committed !== undefined) update.committed = String(b.committed);
+  const [item] = await db
+    .update(budgetItemsTable)
+    .set(update)
+    .where(eq(budgetItemsTable.id, id))
+    .returning();
+  if (!item) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  res.json(fBudget(item));
+});
+
+router.get("/ra-bills", async (req, res): Promise<void> => {
+  const projectId = req.query.projectId
+    ? parseInt(req.query.projectId as string, 10)
+    : null;
+  const baseQuery = db
+    .select({ r: raBillsTable, p: projectsTable.name })
+    .from(raBillsTable)
+    .leftJoin(projectsTable, eq(projectsTable.id, raBillsTable.projectId));
+  const rows = projectId
+    ? await baseQuery.where(eq(raBillsTable.projectId, projectId)).orderBy(desc(raBillsTable.createdAt))
+    : await baseQuery.orderBy(desc(raBillsTable.createdAt));
+  res.json(rows.map((r) => ({ ...fRa(r.r), projectName: r.p })));
+});
+
+router.post("/ra-bills", async (req, res): Promise<void> => {
+  const b = req.body ?? {};
+  const me = await getCurrentUser();
+  const [bill] = await db
+    .insert(raBillsTable)
+    .values({
+      projectId: b.projectId,
+      billNumber: b.billNumber,
+      description: b.description ?? null,
+      amount: String(b.amount),
+      milestone: b.milestone ?? null,
+      createdById: me.id,
+    })
+    .returning();
+  res.status(201).json(fRa(bill!));
+});
+
+router.patch("/ra-bills/:id", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id as string, 10);
+  const b = req.body ?? {};
+  const update: Record<string, unknown> = {};
+  if (b.status !== undefined) update.status = b.status;
+  if (b.description !== undefined) update.description = b.description;
+  if (b.amount !== undefined) update.amount = String(b.amount);
+  const [bill] = await db
+    .update(raBillsTable)
+    .set(update)
+    .where(eq(raBillsTable.id, id))
+    .returning();
+  if (!bill) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  res.json(fRa(bill));
+});
+
+router.get("/stakeholders", async (req, res): Promise<void> => {
+  const projectId = req.query.projectId
+    ? parseInt(req.query.projectId as string, 10)
+    : null;
+  const baseQuery = db
+    .select({ s: stakeholdersTable, p: projectsTable.name })
+    .from(stakeholdersTable)
+    .leftJoin(projectsTable, eq(projectsTable.id, stakeholdersTable.projectId));
+  const rows = projectId
+    ? await baseQuery.where(eq(stakeholdersTable.projectId, projectId))
+    : await baseQuery;
+  res.json(rows.map((r) => ({ ...r.s, projectName: r.p })));
+});
+
+router.post("/stakeholders", async (req, res): Promise<void> => {
+  const b = req.body ?? {};
+  const [s] = await db
+    .insert(stakeholdersTable)
+    .values({
+      projectId: b.projectId,
+      name: b.name,
+      email: b.email ?? null,
+      phone: b.phone ?? null,
+      organization: b.organization ?? null,
+      role: b.role ?? null,
+      accessLevel: b.accessLevel ?? "read",
+    })
+    .returning();
+  res.status(201).json(s);
+});
+
+export default router;

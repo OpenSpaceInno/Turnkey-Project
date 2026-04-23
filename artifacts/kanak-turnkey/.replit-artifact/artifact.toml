@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Kanak Turnkey Projects"
+version = "1.0.0"
+id = "artifacts/kanak-turnkey"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21649
+
+[services.development]
+run = "pnpm --filter @workspace/kanak-turnkey run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/kanak-turnkey", "run", "build" ]
+publicDir = "artifacts/kanak-turnkey/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21649"
+BASE_PATH = "/"
