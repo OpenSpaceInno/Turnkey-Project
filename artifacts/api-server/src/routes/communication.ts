@@ -59,7 +59,19 @@ router.get("/meetings", async (req, res): Promise<void> => {
   const rows = projectId
     ? await baseQuery.where(eq(meetingsTable.projectId, projectId)).orderBy(desc(meetingsTable.meetingDate))
     : await baseQuery.orderBy(desc(meetingsTable.meetingDate));
-  res.json(rows.map((r) => ({ ...r.m, projectName: r.p })));
+  res.json(
+    rows.map((r) => {
+      const start = r.m.meetingDate;
+      const end = new Date(start.getTime() + r.m.duration * 60_000);
+      return {
+        ...r.m,
+        projectName: r.p,
+        startTime: start.toISOString(),
+        endTime: end.toISOString(),
+        meetingLink: null,
+      };
+    }),
+  );
 });
 
 router.post("/meetings", async (req, res): Promise<void> => {
@@ -131,6 +143,8 @@ router.get("/documents", async (req, res): Promise<void> => {
       ...r.d,
       projectName: r.p,
       uploadedByName: r.u,
+      title: r.d.fileName,
+      createdAt: r.d.uploadedAt.toISOString(),
     })),
   );
 });
