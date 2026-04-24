@@ -12,6 +12,7 @@ import {
 } from "@workspace/db";
 import { numKeys } from "../lib/transforms";
 import { getCurrentUser } from "../lib/session";
+import { generateNumber } from "../lib/numbers";
 
 const router: IRouter = Router();
 
@@ -97,15 +98,18 @@ router.get("/invoices", async (req, res): Promise<void> => {
 
 router.post("/invoices", async (req, res): Promise<void> => {
   const b = req.body ?? {};
+  const invoiceNumber =
+    b.invoiceNumber || (await generateNumber("INV", invoicesTable));
   const [i] = await db
     .insert(invoicesTable)
     .values({
       projectId: b.projectId,
-      invoiceNumber: b.invoiceNumber,
+      invoiceNumber,
       clientName: b.clientName,
       amount: String(b.amount),
       invoiceDate: b.invoiceDate,
       dueDate: b.dueDate,
+      status: b.status ?? "draft",
     })
     .returning();
   res.status(201).json(fAmt(i!));
@@ -158,14 +162,17 @@ router.get("/vendor-invoices", async (req, res): Promise<void> => {
 
 router.post("/vendor-invoices", async (req, res): Promise<void> => {
   const b = req.body ?? {};
+  const invoiceNumber =
+    b.invoiceNumber || (await generateNumber("VINV", vendorInvoicesTable));
   const [vi] = await db
     .insert(vendorInvoicesTable)
     .values({
       projectId: b.projectId,
       vendorId: b.vendorId,
       purchaseOrderId: b.purchaseOrderId ?? null,
-      invoiceNumber: b.invoiceNumber,
+      invoiceNumber,
       amount: String(b.amount),
+      status: b.status ?? "received",
     })
     .returning();
   res.status(201).json(fAmt(vi!));
@@ -201,7 +208,13 @@ router.get("/financial-instruments", async (_req, res): Promise<void> => {
       eq(projectsTable.id, financialInstrumentsTable.projectId),
     )
     .orderBy(desc(financialInstrumentsTable.createdAt));
-  res.json(rows.map((r) => ({ ...fInst(r.f), projectName: r.p })));
+  res.json(
+    rows.map((r) => ({
+      ...fInst(r.f),
+      projectName: r.p,
+      instrumentNumber: r.f.referenceNumber,
+    })),
+  );
 });
 
 router.post("/financial-instruments", async (req, res): Promise<void> => {
@@ -218,7 +231,10 @@ router.post("/financial-instruments", async (req, res): Promise<void> => {
       expiryDate: b.expiryDate ?? null,
       releaseDate: b.releaseDate ?? null,
       bankName: b.bankName ?? null,
-      referenceNumber: b.referenceNumber ?? null,
+      referenceNumber:
+        b.referenceNumber ||
+        b.instrumentNumber ||
+        (await generateNumber("FI", financialInstrumentsTable)),
       retentionPercent:
         b.retentionPercent != null ? String(b.retentionPercent) : null,
       status: b.status ?? "active",

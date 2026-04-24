@@ -1,11 +1,15 @@
-import { useState } from "react";
 import { useListExpenses, useListInvoices, useListVendorInvoices, useListFinancialInstruments } from "@workspace/api-client-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plus } from "lucide-react";
 import { format } from "date-fns";
+import {
+  NewExpenseDialog,
+  NewInvoiceDialog,
+  NewVendorInvoiceDialog,
+  NewFinancialInstrumentDialog,
+} from "@/components/dialogs/finance-dialogs";
 
 export default function Finance() {
   const { data: expenses, isLoading: loadingExpenses } = useListExpenses();
@@ -33,7 +37,11 @@ export default function Finance() {
         <TabsContent value="expenses" className="space-y-4 pt-4">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold">Expenses</h2>
-            <Button size="sm" className="gap-2"><Plus className="w-4 h-4" /> Record Expense</Button>
+            <NewExpenseDialog
+              trigger={
+                <Button size="sm" className="gap-2"><Plus className="w-4 h-4" /> Record Expense</Button>
+              }
+            />
           </div>
           <div className="rounded-md border bg-card">
             <table className="w-full text-sm text-left">
@@ -73,7 +81,11 @@ export default function Finance() {
         <TabsContent value="client_invoices" className="space-y-4 pt-4">
            <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold">Client Invoices</h2>
-            <Button size="sm" className="gap-2"><Plus className="w-4 h-4" /> Create Invoice</Button>
+            <NewInvoiceDialog
+              trigger={
+                <Button size="sm" className="gap-2"><Plus className="w-4 h-4" /> Create Invoice</Button>
+              }
+            />
           </div>
            <div className="rounded-md border bg-card">
             <table className="w-full text-sm text-left">
@@ -113,17 +125,53 @@ export default function Finance() {
         <TabsContent value="vendor_invoices" className="space-y-4 pt-4">
            <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold">Vendor Invoices</h2>
-            <Button size="sm" className="gap-2"><Plus className="w-4 h-4" /> Add Vendor Invoice</Button>
+            <NewVendorInvoiceDialog
+              trigger={
+                <Button size="sm" className="gap-2"><Plus className="w-4 h-4" /> Add Vendor Invoice</Button>
+              }
+            />
           </div>
-          <div className="rounded-md border bg-card p-8 text-center text-muted-foreground">
-            Vendor invoices list...
+          <div className="rounded-md border bg-card">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-muted/50 text-muted-foreground border-b">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Invoice #</th>
+                  <th className="px-4 py-3 font-medium">Vendor</th>
+                  <th className="px-4 py-3 font-medium">Project</th>
+                  <th className="px-4 py-3 font-medium">Amount</th>
+                  <th className="px-4 py-3 font-medium text-right">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {vendorInvoices?.map(vi => (
+                  <tr key={vi.id} className="hover:bg-accent/50 transition-colors">
+                    <td className="px-4 py-3 font-mono">{vi.invoiceNumber}</td>
+                    <td className="px-4 py-3">{vi.vendorName}</td>
+                    <td className="px-4 py-3">{vi.projectName}</td>
+                    <td className="px-4 py-3">
+                      {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(vi.amount)}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <Badge variant={vi.status === 'paid' ? 'default' : 'secondary'}>{vi.status}</Badge>
+                    </td>
+                  </tr>
+                ))}
+                {!vendorInvoices?.length && !loadingVendorInvoices && (
+                  <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground border-dashed border-t">No vendor invoices recorded.</td></tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </TabsContent>
 
         <TabsContent value="instruments" className="space-y-4 pt-4">
            <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold">Financial Instruments</h2>
-            <Button size="sm" className="gap-2"><Plus className="w-4 h-4" /> Add Instrument</Button>
+            <NewFinancialInstrumentDialog
+              trigger={
+                <Button size="sm" className="gap-2"><Plus className="w-4 h-4" /> Add Instrument</Button>
+              }
+            />
           </div>
           <div className="rounded-md border bg-card">
             <table className="w-full text-sm text-left">
@@ -148,7 +196,7 @@ export default function Finance() {
                     <td className="px-4 py-3">
                       {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(inst.amount)}
                     </td>
-                    <td className="px-4 py-3">{format(new Date(inst.expiryDate), "MMM d, yyyy")}</td>
+                    <td className="px-4 py-3">{inst.expiryDate ? format(new Date(inst.expiryDate), "MMM d, yyyy") : '-'}</td>
                     <td className="px-4 py-3 text-right">
                       <Badge variant={inst.status === 'active' ? 'default' : 'secondary'}>{inst.status}</Badge>
                     </td>

@@ -30,6 +30,8 @@ export interface FinancialInstrument {
   /** @nullable */
   referenceNumber?: string | null;
   /** @nullable */
+  instrumentNumber?: string | null;
+  /** @nullable */
   retentionPercent?: number | null;
   status: FinancialInstrumentStatus;
   /** @nullable */

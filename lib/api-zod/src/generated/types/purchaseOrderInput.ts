@@ -5,14 +5,18 @@
  * Kanak Turnkey Projects API
  * OpenAPI spec version: 0.1.0
  */
+import type { PurchaseOrderInputStatus } from "./purchaseOrderInputStatus";
 
 export interface PurchaseOrderInput {
   projectId: number;
   vendorId: number;
-  poNumber: string;
+  /** @nullable */
+  poNumber?: string | null;
   /** @nullable */
   description?: string | null;
   totalAmount: number;
   /** @nullable */
   deliveryDate?: Date | null;
+  /** @nullable */
+  status?: PurchaseOrderInputStatus;
 }

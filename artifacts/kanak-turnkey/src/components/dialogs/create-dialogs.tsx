@@ -497,7 +497,7 @@ export function NewTaskDialog({
           : undefined,
         startDate: form.startDate || undefined,
         endDate: form.endDate || undefined,
-        priority: form.priority as "urgent" | "high" | "medium" | "low",
+        priority: form.priority as "high" | "medium" | "low",
         status: form.status as
           | "todo"
           | "in_progress"
@@ -599,7 +599,6 @@ export function NewTaskDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="urgent">Urgent</SelectItem>
                 <SelectItem value="high">High</SelectItem>
                 <SelectItem value="medium">Medium</SelectItem>
                 <SelectItem value="low">Low</SelectItem>

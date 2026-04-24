@@ -978,13 +978,30 @@ export interface Invoice {
   status: InvoiceStatus;
 }
 
+/**
+ * @nullable
+ */
+export type InvoiceInputStatus =
+  | (typeof InvoiceInputStatus)[keyof typeof InvoiceInputStatus]
+  | null;
+
+export const InvoiceInputStatus = {
+  draft: "draft",
+  sent: "sent",
+  paid: "paid",
+  overdue: "overdue",
+} as const;
+
 export interface InvoiceInput {
   projectId: number;
-  invoiceNumber: string;
+  /** @nullable */
+  invoiceNumber?: string | null;
   clientName: string;
   amount: number;
   invoiceDate: string;
   dueDate: string;
+  /** @nullable */
+  status?: InvoiceInputStatus;
 }
 
 /**
@@ -1041,13 +1058,32 @@ export interface VendorInvoice {
   paymentDate?: string | null;
 }
 
+/**
+ * @nullable
+ */
+export type VendorInvoiceInputStatus =
+  | (typeof VendorInvoiceInputStatus)[keyof typeof VendorInvoiceInputStatus]
+  | null;
+
+export const VendorInvoiceInputStatus = {
+  received: "received",
+  matched: "matched",
+  discrepancy: "discrepancy",
+  approved: "approved",
+  scheduled: "scheduled",
+  paid: "paid",
+} as const;
+
 export interface VendorInvoiceInput {
   projectId: number;
   vendorId: number;
   /** @nullable */
   purchaseOrderId?: number | null;
-  invoiceNumber: string;
+  /** @nullable */
+  invoiceNumber?: string | null;
   amount: number;
+  /** @nullable */
+  status?: VendorInvoiceInputStatus;
 }
 
 /**
@@ -1128,6 +1164,8 @@ export interface FinancialInstrument {
   bankName?: string | null;
   /** @nullable */
   referenceNumber?: string | null;
+  /** @nullable */
+  instrumentNumber?: string | null;
   /** @nullable */
   retentionPercent?: number | null;
   status: FinancialInstrumentStatus;
@@ -1439,15 +1477,34 @@ export interface PurchaseOrder {
   createdAt: string;
 }
 
+/**
+ * @nullable
+ */
+export type PurchaseOrderInputStatus =
+  | (typeof PurchaseOrderInputStatus)[keyof typeof PurchaseOrderInputStatus]
+  | null;
+
+export const PurchaseOrderInputStatus = {
+  draft: "draft",
+  issued: "issued",
+  acknowledged: "acknowledged",
+  in_transit: "in_transit",
+  delivered: "delivered",
+  cancelled: "cancelled",
+} as const;
+
 export interface PurchaseOrderInput {
   projectId: number;
   vendorId: number;
-  poNumber: string;
+  /** @nullable */
+  poNumber?: string | null;
   /** @nullable */
   description?: string | null;
   totalAmount: number;
   /** @nullable */
   deliveryDate?: string | null;
+  /** @nullable */
+  status?: PurchaseOrderInputStatus;
 }
 
 /**

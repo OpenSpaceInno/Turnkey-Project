@@ -1108,14 +1108,15 @@ components:
         status: { type: string, enum: [draft, sent, paid, overdue] }
     InvoiceInput:
       type: object
-      required: [projectId, invoiceNumber, clientName, amount, invoiceDate, dueDate]
+      required: [projectId, clientName, amount, invoiceDate, dueDate]
       properties:
         projectId: { type: integer }
-        invoiceNumber: { type: string }
+        invoiceNumber: { type: ["string", "null"] }
         clientName: { type: string }
         amount: { type: number }
         invoiceDate: { type: string, format: date }
         dueDate: { type: string, format: date }
+        status: { type: ["string", "null"], enum: [draft, sent, paid, overdue, null] }
     InvoiceUpdate:
       type: object
       properties:
@@ -1140,13 +1141,14 @@ components:
         paymentDate: { type: ["string", "null"], format: date }
     VendorInvoiceInput:
       type: object
-      required: [projectId, vendorId, invoiceNumber, amount]
+      required: [projectId, vendorId, amount]
       properties:
         projectId: { type: integer }
         vendorId: { type: integer }
         purchaseOrderId: { type: ["integer", "null"] }
-        invoiceNumber: { type: string }
+        invoiceNumber: { type: ["string", "null"] }
         amount: { type: number }
+        status: { type: ["string", "null"], enum: [received, matched, discrepancy, approved, scheduled, paid, null] }
     VendorInvoiceUpdate:
       type: object
       properties:
@@ -1169,6 +1171,7 @@ components:
         releaseDate: { type: ["string", "null"], format: date }
         bankName: { type: ["string", "null"] }
         referenceNumber: { type: ["string", "null"] }
+        instrumentNumber: { type: ["string", "null"] }
         retentionPercent: { type: ["number", "null"] }
         status: { type: string, enum: [active, released, expired, forfeited, overdue] }
         notes: { type: ["string", "null"] }
@@ -1319,14 +1322,15 @@ components:
         createdAt: { type: string, format: date-time }
     PurchaseOrderInput:
       type: object
-      required: [projectId, vendorId, poNumber, totalAmount]
+      required: [projectId, vendorId, totalAmount]
       properties:
         projectId: { type: integer }
         vendorId: { type: integer }
-        poNumber: { type: string }
+        poNumber: { type: ["string", "null"] }
         description: { type: ["string", "null"] }
         totalAmount: { type: number }
         deliveryDate: { type: ["string", "null"], format: date }
+        status: { type: ["string", "null"], enum: [draft, issued, acknowledged, in_transit, delivered, cancelled, null] }
     PurchaseOrderUpdate:
       type: object
       properties:

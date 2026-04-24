@@ -5,12 +5,16 @@
  * Kanak Turnkey Projects API
  * OpenAPI spec version: 0.1.0
  */
+import type { VendorInvoiceInputStatus } from "./vendorInvoiceInputStatus";
 
 export interface VendorInvoiceInput {
   projectId: number;
   vendorId: number;
   /** @nullable */
   purchaseOrderId?: number | null;
-  invoiceNumber: string;
+  /** @nullable */
+  invoiceNumber?: string | null;
   amount: number;
+  /** @nullable */
+  status?: VendorInvoiceInputStatus;
 }

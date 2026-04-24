@@ -1321,11 +1321,20 @@ export const ListInvoicesResponse = zod.array(ListInvoicesResponseItem);
 
 export const CreateInvoiceBody = zod.object({
   projectId: zod.number(),
-  invoiceNumber: zod.string(),
+  invoiceNumber: zod.string().nullish(),
   clientName: zod.string(),
   amount: zod.number(),
   invoiceDate: zod.coerce.date(),
   dueDate: zod.coerce.date(),
+  status: zod
+    .union([
+      zod.literal("draft"),
+      zod.literal("sent"),
+      zod.literal("paid"),
+      zod.literal("overdue"),
+      zod.literal(null),
+    ])
+    .nullish(),
 });
 
 export const UpdateInvoiceParams = zod.object({
@@ -1392,8 +1401,19 @@ export const CreateVendorInvoiceBody = zod.object({
   projectId: zod.number(),
   vendorId: zod.number(),
   purchaseOrderId: zod.number().nullish(),
-  invoiceNumber: zod.string(),
+  invoiceNumber: zod.string().nullish(),
   amount: zod.number(),
+  status: zod
+    .union([
+      zod.literal("received"),
+      zod.literal("matched"),
+      zod.literal("discrepancy"),
+      zod.literal("approved"),
+      zod.literal("scheduled"),
+      zod.literal("paid"),
+      zod.literal(null),
+    ])
+    .nullish(),
 });
 
 export const UpdateVendorInvoiceParams = zod.object({
@@ -1456,6 +1476,7 @@ export const ListFinancialInstrumentsResponseItem = zod.object({
   releaseDate: zod.coerce.date().nullish(),
   bankName: zod.string().nullish(),
   referenceNumber: zod.string().nullish(),
+  instrumentNumber: zod.string().nullish(),
   retentionPercent: zod.number().nullish(),
   status: zod.enum(["active", "released", "expired", "forfeited", "overdue"]),
   notes: zod.string().nullish(),
@@ -1551,6 +1572,7 @@ export const UpdateFinancialInstrumentResponse = zod.object({
   releaseDate: zod.coerce.date().nullish(),
   bankName: zod.string().nullish(),
   referenceNumber: zod.string().nullish(),
+  instrumentNumber: zod.string().nullish(),
   retentionPercent: zod.number().nullish(),
   status: zod.enum(["active", "released", "expired", "forfeited", "overdue"]),
   notes: zod.string().nullish(),
@@ -1840,10 +1862,21 @@ export const ListPurchaseOrdersResponse = zod.array(
 export const CreatePurchaseOrderBody = zod.object({
   projectId: zod.number(),
   vendorId: zod.number(),
-  poNumber: zod.string(),
+  poNumber: zod.string().nullish(),
   description: zod.string().nullish(),
   totalAmount: zod.number(),
   deliveryDate: zod.coerce.date().nullish(),
+  status: zod
+    .union([
+      zod.literal("draft"),
+      zod.literal("issued"),
+      zod.literal("acknowledged"),
+      zod.literal("in_transit"),
+      zod.literal("delivered"),
+      zod.literal("cancelled"),
+      zod.literal(null),
+    ])
+    .nullish(),
 });
 
 export const UpdatePurchaseOrderParams = zod.object({

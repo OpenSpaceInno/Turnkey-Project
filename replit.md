@@ -32,3 +32,14 @@ pnpm --filter @workspace/api-spec run codegen   # regenerates client + zod
 pnpm --filter @workspace/db run push            # pushes schema to PG
 pnpm -w exec tsc -b lib/db                      # rebuild types after schema changes
 ```
+
+## Create dialogs
+
+CRUD entry points are split across:
+
+- `artifacts/kanak-turnkey/src/components/dialogs/create-dialogs.tsx` — Lead, Project, Task
+- `artifacts/kanak-turnkey/src/components/dialogs/finance-dialogs.tsx` — Expense, Invoice, VendorInvoice, FinancialInstrument
+- `artifacts/kanak-turnkey/src/components/dialogs/procurement-dialogs.tsx` — Vendor, PurchaseOrder, RFQ, Material
+- `artifacts/kanak-turnkey/src/components/dialogs/communication-dialogs.tsx` — Communication, Meeting, Document
+
+All dialogs accept a `trigger` ReactNode prop, use TanStack Query to invalidate the relevant `getList*QueryKey` (and dashboard summary where applicable), and rely on the API server to auto-generate human-readable numbers (`INV-`, `VINV-`, `FI-`, `PO-`) via `artifacts/api-server/src/lib/numbers.ts`.

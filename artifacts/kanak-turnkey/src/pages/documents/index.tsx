@@ -1,16 +1,27 @@
+import { useState, useMemo } from "react";
 import { useListDocuments } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Plus, FileText, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
+import { NewDocumentDialog } from "@/components/dialogs/communication-dialogs";
 
 export default function Documents() {
   const { data: documents, isLoading } = useListDocuments();
+  const [search, setSearch] = useState("");
 
-  if (isLoading) {
-    return <div className="p-6">Loading documents...</div>;
-  }
+  const filtered = useMemo(() => {
+    if (!documents) return [];
+    if (!search.trim()) return documents;
+    const q = search.toLowerCase();
+    return documents.filter(
+      (d) =>
+        d.fileName.toLowerCase().includes(q) ||
+        (d.projectName ?? "").toLowerCase().includes(q) ||
+        d.category.toLowerCase().includes(q),
+    );
+  }, [documents, search]);
 
   return (
     <div className="space-y-6">
@@ -19,15 +30,24 @@ export default function Documents() {
           <h1 className="text-3xl font-bold tracking-tight">Documents</h1>
           <p className="text-muted-foreground">Central repository for all project documents.</p>
         </div>
-        <Button className="shrink-0 gap-2">
-          <Plus className="h-4 w-4" /> Upload Document
-        </Button>
+        <NewDocumentDialog
+          trigger={
+            <Button className="shrink-0 gap-2">
+              <Plus className="h-4 w-4" /> Upload Document
+            </Button>
+          }
+        />
       </div>
 
       <div className="flex items-center gap-2">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search documents..." className="pl-8" />
+          <Input
+            placeholder="Search documents..."
+            className="pl-8"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
       </div>
 
@@ -38,25 +58,51 @@ export default function Documents() {
               <th className="px-4 py-3 font-medium">Name</th>
               <th className="px-4 py-3 font-medium">Project</th>
               <th className="px-4 py-3 font-medium">Category</th>
+              <th className="px-4 py-3 font-medium">Status</th>
               <th className="px-4 py-3 font-medium text-right">Uploaded</th>
             </tr>
           </thead>
           <tbody className="divide-y">
-            {documents?.map(doc => (
-              <tr key={doc.id} className="hover:bg-accent/50 transition-colors">
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-primary" />
-                    <span className="font-medium text-primary hover:underline cursor-pointer">{doc.title}</span>
-                  </div>
+            {filtered.map((doc) => {
+              const NameCell = doc.fileUrl ? (
+                <a
+                  href={doc.fileUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-primary hover:underline"
+                >
+                  {doc.fileName}
+                </a>
+              ) : (
+                <span className="font-medium">{doc.fileName}</span>
+              );
+              return (
+                <tr key={doc.id} className="hover:bg-accent/50 transition-colors">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-primary shrink-0" />
+                      {NameCell}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">{doc.projectName}</td>
+                  <td className="px-4 py-3">
+                    <Badge variant="outline" className="capitalize">{doc.category}</Badge>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge variant={doc.status === "active" ? "default" : "secondary"} className="capitalize">{doc.status}</Badge>
+                  </td>
+                  <td className="px-4 py-3 text-right text-muted-foreground">
+                    {format(new Date(doc.uploadedAt), "MMM d, yyyy")}
+                  </td>
+                </tr>
+              );
+            })}
+            {!filtered.length && !isLoading && (
+              <tr>
+                <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground border-dashed border-t">
+                  {search ? "No documents match your search." : "No documents uploaded yet."}
                 </td>
-                <td className="px-4 py-3 text-muted-foreground">{doc.projectName}</td>
-                <td className="px-4 py-3"><Badge variant="outline">{doc.category}</Badge></td>
-                <td className="px-4 py-3 text-right text-muted-foreground">{format(new Date(doc.createdAt), "MMM d, yyyy")}</td>
               </tr>
-            ))}
-            {!documents?.length && (
-              <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground border-dashed border-t">No documents found.</td></tr>
             )}
           </tbody>
         </table>

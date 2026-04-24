@@ -1,20 +1,34 @@
-import { useListVendors, useListPurchaseOrders } from "@workspace/api-client-react";
+import {
+  useListVendors,
+  useListPurchaseOrders,
+  useListRfqs,
+  useListMaterials,
+} from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Star } from "lucide-react";
 import { format } from "date-fns";
+import {
+  NewVendorDialog,
+  NewPurchaseOrderDialog,
+  NewRfqDialog,
+  NewMaterialDialog,
+} from "@/components/dialogs/procurement-dialogs";
 
 export default function Procurement() {
   const { data: vendors, isLoading: loadingVendors } = useListVendors();
   const { data: pos, isLoading: loadingPos } = useListPurchaseOrders();
+  const { data: rfqs, isLoading: loadingRfqs } = useListRfqs();
+  const { data: materials, isLoading: loadingMaterials } = useListMaterials();
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Procurement</h1>
-          <p className="text-muted-foreground">Manage vendors, RFQs, and purchase orders.</p>
+          <p className="text-muted-foreground">Manage vendors, RFQs, purchase orders, and inventory.</p>
         </div>
       </div>
 
@@ -25,11 +39,15 @@ export default function Procurement() {
           <TabsTrigger value="rfqs">RFQs</TabsTrigger>
           <TabsTrigger value="materials">Materials</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="pos" className="space-y-4 pt-4">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold">Purchase Orders</h2>
-            <Button size="sm" className="gap-2"><Plus className="w-4 h-4" /> Create PO</Button>
+            <NewPurchaseOrderDialog
+              trigger={
+                <Button size="sm" className="gap-2"><Plus className="w-4 h-4" /> Create PO</Button>
+              }
+            />
           </div>
           <div className="rounded-md border bg-card">
             <table className="w-full text-sm text-left">
@@ -67,33 +85,123 @@ export default function Procurement() {
         <TabsContent value="vendors" className="space-y-4 pt-4">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold">Vendors</h2>
-            <Button size="sm" className="gap-2"><Plus className="w-4 h-4" /> Add Vendor</Button>
+            <NewVendorDialog
+              trigger={
+                <Button size="sm" className="gap-2"><Plus className="w-4 h-4" /> Add Vendor</Button>
+              }
+            />
           </div>
           <div className="grid gap-4 md:grid-cols-3">
             {vendors?.map(vendor => (
               <Card key={vendor.id}>
-                <CardHeader>
-                  <CardTitle className="text-base">{vendor.name}</CardTitle>
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <CardTitle className="text-base">{vendor.name}</CardTitle>
+                    <Badge variant={vendor.status === 'active' ? 'default' : 'secondary'}>{vendor.status}</Badge>
+                  </div>
                 </CardHeader>
                 <CardContent className="text-sm space-y-2">
-                  <div className="text-muted-foreground">{vendor.category}</div>
-                  <div>{vendor.email}</div>
-                  <div>{vendor.phone}</div>
+                  <div className="text-muted-foreground">{vendor.category || 'Uncategorized'}</div>
+                  {vendor.contactPerson && <div>{vendor.contactPerson}</div>}
+                  {vendor.email && <div className="text-muted-foreground">{vendor.email}</div>}
+                  {vendor.phone && <div className="text-muted-foreground">{vendor.phone}</div>}
+                  {vendor.rating > 0 && (
+                    <div className="flex items-center gap-1 text-amber-500 pt-1">
+                      <Star className="w-4 h-4 fill-current" />
+                      <span className="font-medium">{vendor.rating.toFixed(1)}</span>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))}
+            {!vendors?.length && !loadingVendors && (
+              <div className="md:col-span-3 rounded-md border border-dashed p-8 text-center text-muted-foreground">
+                No vendors yet.
+              </div>
+            )}
           </div>
         </TabsContent>
-        
+
         <TabsContent value="rfqs" className="space-y-4 pt-4">
-          <div className="rounded-md border bg-card p-8 text-center text-muted-foreground">
-            RFQs list and quotation comparison...
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold">Requests for Quotation</h2>
+            <NewRfqDialog
+              trigger={
+                <Button size="sm" className="gap-2"><Plus className="w-4 h-4" /> Create RFQ</Button>
+              }
+            />
+          </div>
+          <div className="rounded-md border bg-card">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-muted/50 text-muted-foreground border-b">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Title</th>
+                  <th className="px-4 py-3 font-medium">Project</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium text-right">Created</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {rfqs?.map(rfq => (
+                  <tr key={rfq.id} className="hover:bg-accent/50 transition-colors">
+                    <td className="px-4 py-3 font-medium">{rfq.title}</td>
+                    <td className="px-4 py-3">{rfq.projectName}</td>
+                    <td className="px-4 py-3">
+                      <Badge variant="outline" className="capitalize">{rfq.status.replace('_', ' ')}</Badge>
+                    </td>
+                    <td className="px-4 py-3 text-right text-muted-foreground">{format(new Date(rfq.createdAt), "MMM d, yyyy")}</td>
+                  </tr>
+                ))}
+                {!rfqs?.length && !loadingRfqs && (
+                  <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground border-dashed border-t">No RFQs yet.</td></tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </TabsContent>
 
         <TabsContent value="materials" className="space-y-4 pt-4">
-          <div className="rounded-md border bg-card p-8 text-center text-muted-foreground">
-            Materials inventory...
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold">Materials Inventory</h2>
+            <NewMaterialDialog
+              trigger={
+                <Button size="sm" className="gap-2"><Plus className="w-4 h-4" /> Add Material</Button>
+              }
+            />
+          </div>
+          <div className="rounded-md border bg-card">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-muted/50 text-muted-foreground border-b">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Material</th>
+                  <th className="px-4 py-3 font-medium">Project</th>
+                  <th className="px-4 py-3 font-medium">Unit</th>
+                  <th className="px-4 py-3 font-medium text-right">On Hand</th>
+                  <th className="px-4 py-3 font-medium text-right">Committed</th>
+                  <th className="px-4 py-3 font-medium text-right">Consumed</th>
+                  <th className="px-4 py-3 font-medium text-right">Min. Stock</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {materials?.map(m => {
+                  const low = m.quantityOnHand <= m.minimumStock;
+                  return (
+                    <tr key={m.id} className="hover:bg-accent/50 transition-colors">
+                      <td className="px-4 py-3 font-medium">{m.name}</td>
+                      <td className="px-4 py-3">{m.projectName || <span className="text-muted-foreground">General</span>}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{m.unit}</td>
+                      <td className={`px-4 py-3 text-right ${low ? 'text-destructive font-semibold' : ''}`}>{m.quantityOnHand}</td>
+                      <td className="px-4 py-3 text-right">{m.quantityCommitted}</td>
+                      <td className="px-4 py-3 text-right">{m.quantityConsumed}</td>
+                      <td className="px-4 py-3 text-right text-muted-foreground">{m.minimumStock}</td>
+                    </tr>
+                  );
+                })}
+                {!materials?.length && !loadingMaterials && (
+                  <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground border-dashed border-t">No materials tracked yet.</td></tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </TabsContent>
       </Tabs>

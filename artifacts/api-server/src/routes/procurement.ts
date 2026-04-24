@@ -13,6 +13,7 @@ import {
 } from "@workspace/db";
 import { numKeys } from "../lib/transforms";
 import { getCurrentUser } from "../lib/session";
+import { generateNumber } from "../lib/numbers";
 
 const router: IRouter = Router();
 
@@ -264,15 +265,18 @@ router.get("/purchase-orders", async (_req, res): Promise<void> => {
 router.post("/purchase-orders", async (req, res): Promise<void> => {
   const b = req.body ?? {};
   const me = await getCurrentUser();
+  const poNumber =
+    b.poNumber || (await generateNumber("PO", purchaseOrdersTable));
   const [po] = await db
     .insert(purchaseOrdersTable)
     .values({
       projectId: b.projectId,
       vendorId: b.vendorId,
-      poNumber: b.poNumber,
+      poNumber,
       description: b.description ?? null,
       totalAmount: String(b.totalAmount),
       deliveryDate: b.deliveryDate ?? null,
+      status: b.status ?? "draft",
       createdById: me.id,
     })
     .returning();
