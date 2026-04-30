@@ -1,18 +1,84 @@
-import { useParams, Link } from "wouter";
-import { useGetLead, getGetLeadQueryKey } from "@workspace/api-client-react";
+import { useParams, Link, useLocation } from "wouter";
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  useGetLead,
+  getGetLeadQueryKey,
+  useConvertLead,
+  getListLeadsQueryKey,
+  getListProjectsQueryKey,
+  getGetDashboardSummaryQueryKey,
+} from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { ChevronLeft, Edit, Mail, Phone, MapPin, Calendar } from "lucide-react";
+import {
+  ChevronLeft,
+  Edit,
+  Mail,
+  Phone,
+  MapPin,
+  Calendar,
+  Trophy,
+  ArrowRight,
+} from "lucide-react";
 
 export default function LeadDetail() {
   const { id } = useParams();
   const leadId = parseInt(id || "0", 10);
-  
-  const { data: lead, isLoading } = useGetLead(leadId, { 
-    query: { enabled: !!leadId, queryKey: getGetLeadQueryKey(leadId) } 
+  const [, navigate] = useLocation();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [convertOpen, setConvertOpen] = useState(false);
+  const [projectName, setProjectName] = useState("");
+  const [startDate, setStartDate] = useState(
+    new Date().toISOString().slice(0, 10),
+  );
+
+  const { data: lead, isLoading } = useGetLead(leadId, {
+    query: { enabled: !!leadId, queryKey: getGetLeadQueryKey(leadId) },
+  });
+
+  const convertMutation = useConvertLead({
+    mutation: {
+      onSuccess: (project) => {
+        queryClient.invalidateQueries({ queryKey: getGetLeadQueryKey(leadId) });
+        queryClient.invalidateQueries({ queryKey: getListLeadsQueryKey() });
+        queryClient.invalidateQueries({
+          queryKey: getListProjectsQueryKey(),
+        });
+        queryClient.invalidateQueries({
+          queryKey: getGetDashboardSummaryQueryKey(),
+        });
+        setConvertOpen(false);
+        toast({
+          title: "Lead converted",
+          description: `Project "${project.name}" created with a full lifecycle of tasks.`,
+        });
+        navigate(`/projects/${project.id}`);
+      },
+      onError: (err: unknown) => {
+        const e = err as { response?: { data?: { error?: string } } };
+        toast({
+          title: "Could not convert lead",
+          description: e?.response?.data?.error ?? "Unknown error",
+          variant: "destructive",
+        });
+      },
+    },
   });
 
   if (isLoading) {
@@ -39,10 +105,92 @@ export default function LeadDetail() {
           </div>
           <p className="text-muted-foreground capitalize">Stage: {lead.stage.replace('_', ' ')} • Priority: {lead.priority}</p>
         </div>
-        <Button variant="outline" className="gap-2">
-          <Edit className="h-4 w-4" /> Edit
-        </Button>
+        <div className="flex items-center gap-2">
+          {lead.wonProjectId ? (
+            <Button asChild className="gap-2">
+              <Link href={`/projects/${lead.wonProjectId}`}>
+                View Project <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
+          ) : lead.status !== "lost" ? (
+            <Button
+              className="gap-2"
+              onClick={() => {
+                setProjectName(
+                  `${lead.customerName}${
+                    lead.projectType ? ` — ${lead.projectType}` : ""
+                  }`,
+                );
+                setConvertOpen(true);
+              }}
+            >
+              <Trophy className="h-4 w-4" /> Mark as Won & Create Project
+            </Button>
+          ) : null}
+          <Button variant="outline" className="gap-2">
+            <Edit className="h-4 w-4" /> Edit
+          </Button>
+        </div>
       </div>
+
+      <Dialog open={convertOpen} onOpenChange={setConvertOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Convert lead to project</DialogTitle>
+            <DialogDescription>
+              We'll mark this lead as <b>won</b>, spin up a new project linked to
+              it, copy the customer in as the primary stakeholder, seed the
+              budget from the latest BOQ, and lay down an 11-step lifecycle of
+              tasks from kickoff to handover.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="convert-name">Project name</Label>
+              <Input
+                id="convert-name"
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+                placeholder="e.g. Citygate Residences"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="convert-start">Project start date</Label>
+              <Input
+                id="convert-start"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setConvertOpen(false)}
+              disabled={convertMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() =>
+                convertMutation.mutate({
+                  id: leadId,
+                  data: {
+                    projectName: projectName || null,
+                    startDate: startDate || null,
+                  },
+                })
+              }
+              disabled={convertMutation.isPending || !projectName.trim()}
+            >
+              {convertMutation.isPending
+                ? "Converting…"
+                : "Convert to project"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-1 space-y-6">

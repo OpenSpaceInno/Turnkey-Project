@@ -101,6 +101,7 @@ export default function Leads() {
                 <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 font-medium">Stage</th>
                 <th className="px-4 py-3 font-medium">Value</th>
+                <th className="px-4 py-3 font-medium">Project</th>
                 <th className="px-4 py-3 font-medium text-right">Created</th>
               </tr>
             </thead>
@@ -127,6 +128,15 @@ export default function Leads() {
                   <td className="px-4 py-3">
                     {lead.budgetEstimate ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(lead.budgetEstimate) : '-'}
                   </td>
+                  <td className="px-4 py-3">
+                    {lead.wonProjectId ? (
+                      <Link href={`/projects/${lead.wonProjectId}`} className="text-primary text-xs font-medium hover:underline">
+                        Open project →
+                      </Link>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-right text-muted-foreground">
                     {format(new Date(lead.createdAt), "MMM d, yyyy")}
                   </td>
@@ -134,7 +144,7 @@ export default function Leads() {
               ))}
               {filteredLeads?.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                  <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
                     No leads found matching your criteria.
                   </td>
                 </tr>

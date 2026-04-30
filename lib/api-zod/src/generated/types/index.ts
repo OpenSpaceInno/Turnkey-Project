@@ -66,6 +66,7 @@ export * from "./invoiceUpdateStatus";
 export * from "./lead";
 export * from "./leadActivity";
 export * from "./leadActivityInput";
+export * from "./leadConvertInput";
 export * from "./leadDetail";
 export * from "./leadInput";
 export * from "./leadInputPriority";

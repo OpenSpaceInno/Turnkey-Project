@@ -490,6 +490,16 @@ export const GetLeadsSummaryResponse = zod.object({
   ),
 });
 
+export const ConvertLeadParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ConvertLeadBody = zod.object({
+  projectName: zod.string().nullish(),
+  startDate: zod.coerce.date().nullish(),
+  endDate: zod.coerce.date().nullish(),
+});
+
 export const ListLeadActivitiesParams = zod.object({
   leadId: zod.coerce.number(),
 });

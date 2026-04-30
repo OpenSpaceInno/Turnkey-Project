@@ -1,11 +1,11 @@
 import { useParams, Link } from "wouter";
-import { 
+import {
   useGetProject, getGetProjectQueryKey,
-  useListTasks,
-  useListBudgetItems,
-  useListRaBills,
-  useListStakeholders,
-  useListDocuments
+  useListTasks, getListTasksQueryKey,
+  useListBudgetItems, getListBudgetItemsQueryKey,
+  useListRaBills, getListRaBillsQueryKey,
+  useListStakeholders, getListStakeholdersQueryKey,
+  useListDocuments, getListDocumentsQueryKey,
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -23,11 +23,31 @@ export default function ProjectDetail() {
     query: { enabled: !!projectId, queryKey: getGetProjectQueryKey(projectId) } 
   });
 
-  const { data: tasks } = useListTasks({ query: { enabled: !!projectId }}); // In real app, filter by projectId
-  const { data: budgetItems } = useListBudgetItems({ query: { enabled: !!projectId }});
-  const { data: raBills } = useListRaBills({ query: { enabled: !!projectId }});
-  const { data: stakeholders } = useListStakeholders({ query: { enabled: !!projectId }});
-  const { data: documents } = useListDocuments({ query: { enabled: !!projectId }});
+  const enabled = !!projectId;
+  const { data: tasks } = useListTasks(
+    { projectId },
+    { query: { enabled, queryKey: getListTasksQueryKey({ projectId }) } },
+  );
+  const { data: budgetItems } = useListBudgetItems(projectId, {
+    query: { enabled, queryKey: getListBudgetItemsQueryKey(projectId) },
+  });
+  const { data: raBills } = useListRaBills(
+    { projectId },
+    { query: { enabled, queryKey: getListRaBillsQueryKey({ projectId }) } },
+  );
+  const { data: stakeholders } = useListStakeholders(
+    { projectId },
+    {
+      query: {
+        enabled,
+        queryKey: getListStakeholdersQueryKey({ projectId }),
+      },
+    },
+  );
+  const { data: documents } = useListDocuments(
+    { projectId },
+    { query: { enabled, queryKey: getListDocumentsQueryKey({ projectId }) } },
+  );
 
   if (isLoading) {
     return <div className="p-6">Loading project details...</div>;
@@ -111,6 +131,61 @@ export default function ProjectDetail() {
                     <p className="text-sm leading-relaxed">{project.description || 'No description provided.'}</p>
                   </CardContent>
                 </Card>
+
+                {projectTasks.length > 0 && (() => {
+                  const phases: Record<string, typeof projectTasks> = {};
+                  for (const t of projectTasks) {
+                    const m = (t.description ?? "").match(/^\[([^\]]+)\]/);
+                    const phase = m ? m[1] : "Other";
+                    (phases[phase] ??= []).push(t);
+                  }
+                  const phaseOrder = ["Initiation", "Planning", "Procurement", "Execution", "Closeout", "Other"];
+                  const completed = projectTasks.filter(t => t.status === 'completed').length;
+                  return (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base">Project Lifecycle</CardTitle>
+                        <CardDescription>
+                          {completed}/{projectTasks.length} tasks complete · auto-seeded when this project was won from its source lead
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-5">
+                        {phaseOrder.filter(p => phases[p]).map(phase => {
+                          const items = phases[phase]!;
+                          const done = items.filter(t => t.status === 'completed').length;
+                          return (
+                            <div key={phase}>
+                              <div className="flex items-center justify-between mb-2">
+                                <h4 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">{phase}</h4>
+                                <span className="text-xs text-muted-foreground">{done}/{items.length}</span>
+                              </div>
+                              <div className="space-y-2">
+                                {items.map(t => {
+                                  const Icon = t.status === 'completed' ? CheckCircle2 : t.status === 'in_progress' ? Clock : Circle;
+                                  const colour = t.status === 'completed' ? 'text-emerald-600' : t.status === 'in_progress' ? 'text-amber-600' : 'text-muted-foreground';
+                                  return (
+                                    <div key={t.id} className="flex items-start gap-3 rounded-md border bg-background/50 px-3 py-2">
+                                      <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${colour}`} />
+                                      <div className="flex-1 min-w-0">
+                                        <div className="text-sm font-medium truncate">{t.title}</div>
+                                        <div className="text-xs text-muted-foreground">
+                                          {t.startDate ? format(new Date(t.startDate), "MMM d") : "—"}
+                                          {" → "}
+                                          {t.endDate ? format(new Date(t.endDate), "MMM d, yyyy") : "—"}
+                                        </div>
+                                      </div>
+                                      <Badge variant="outline" className="text-[10px] capitalize">{t.status.replace('_', ' ')}</Badge>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </CardContent>
+                    </Card>
+                  );
+                })()}
               </TabsContent>
               
               <TabsContent value="tasks" className="m-0 space-y-4">
@@ -260,12 +335,12 @@ export default function ProjectDetail() {
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
                               <FileText className="h-4 w-4 text-primary" />
-                              <span className="font-medium text-primary hover:underline cursor-pointer">{doc.title}</span>
+                              <span className="font-medium text-primary hover:underline cursor-pointer">{doc.fileName}</span>
                             </div>
                           </td>
                           <td className="px-4 py-3"><Badge variant="outline">{doc.category}</Badge></td>
                           <td className="px-4 py-3"><Badge variant="secondary">{doc.status}</Badge></td>
-                          <td className="px-4 py-3 text-right text-muted-foreground">{format(new Date(doc.createdAt), "MMM d, yyyy")}</td>
+                          <td className="px-4 py-3 text-right text-muted-foreground">{format(new Date(doc.uploadedAt), "MMM d, yyyy")}</td>
                         </tr>
                       ))}
                       {projectDocs.length === 0 && (

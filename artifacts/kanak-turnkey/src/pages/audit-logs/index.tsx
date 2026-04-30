@@ -24,9 +24,9 @@ export default function AuditLogs() {
               <tr>
                 <th className="px-4 py-3 font-medium">Time</th>
                 <th className="px-4 py-3 font-medium">User</th>
-                <th className="px-4 py-3 font-medium">Action</th>
-                <th className="px-4 py-3 font-medium">Entity Type</th>
-                <th className="px-4 py-3 font-medium">Entity ID</th>
+                <th className="px-4 py-3 font-medium">Activity</th>
+                <th className="px-4 py-3 font-medium">Resource</th>
+                <th className="px-4 py-3 font-medium">Resource ID</th>
                 <th className="px-4 py-3 font-medium">IP Address</th>
               </tr>
             </thead>
@@ -35,9 +35,9 @@ export default function AuditLogs() {
                 <tr key={log.id} className="hover:bg-accent/50 transition-colors">
                   <td className="px-4 py-2">{format(new Date(log.createdAt), "yyyy-MM-dd HH:mm:ss")}</td>
                   <td className="px-4 py-2 font-sans">{log.userName || log.userId}</td>
-                  <td className="px-4 py-2 text-primary">{log.action}</td>
-                  <td className="px-4 py-2">{log.entityType}</td>
-                  <td className="px-4 py-2">{log.entityId}</td>
+                  <td className="px-4 py-2 text-primary">{log.activity}</td>
+                  <td className="px-4 py-2">{log.resourceType}</td>
+                  <td className="px-4 py-2">{log.resourceId ?? '-'}</td>
                   <td className="px-4 py-2 text-muted-foreground">{log.ipAddress || '-'}</td>
                 </tr>
               ))}

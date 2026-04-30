@@ -47,6 +47,7 @@ import type {
   Lead,
   LeadActivity,
   LeadActivityInput,
+  LeadConvertInput,
   LeadDetail,
   LeadInput,
   LeadsSummary,
@@ -1033,6 +1034,87 @@ export function useGetLeadsSummary<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+export const getConvertLeadUrl = (id: number) => {
+  return `/api/leads/${id}/convert`;
+};
+
+export const convertLead = async (
+  id: number,
+  leadConvertInput?: LeadConvertInput,
+  options?: RequestInit,
+): Promise<Project> => {
+  return customFetch<Project>(getConvertLeadUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(leadConvertInput),
+  });
+};
+
+export const getConvertLeadMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof convertLead>>,
+    TError,
+    { id: number; data: BodyType<LeadConvertInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof convertLead>>,
+  TError,
+  { id: number; data: BodyType<LeadConvertInput> },
+  TContext
+> => {
+  const mutationKey = ["convertLead"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof convertLead>>,
+    { id: number; data: BodyType<LeadConvertInput> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return convertLead(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ConvertLeadMutationResult = NonNullable<
+  Awaited<ReturnType<typeof convertLead>>
+>;
+export type ConvertLeadMutationBody = BodyType<LeadConvertInput>;
+export type ConvertLeadMutationError = ErrorType<unknown>;
+
+export const useConvertLead = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof convertLead>>,
+    TError,
+    { id: number; data: BodyType<LeadConvertInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof convertLead>>,
+  TError,
+  { id: number; data: BodyType<LeadConvertInput> },
+  TContext
+> => {
+  return useMutation(getConvertLeadMutationOptions(options));
+};
 
 export const getListLeadActivitiesUrl = (leadId: number) => {
   return `/api/leads/${leadId}/activities`;

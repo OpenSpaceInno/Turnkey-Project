@@ -10,6 +10,12 @@ import {
   boqItemsTable,
   negotiationsTable,
   usersTable,
+  projectsTable,
+  tasksTable,
+  stakeholdersTable,
+  budgetItemsTable,
+  notificationsTable,
+  auditLogsTable,
 } from "@workspace/db";
 import { numKeys, num } from "../lib/transforms";
 import { getCurrentUser } from "../lib/session";
@@ -536,6 +542,280 @@ router.patch("/negotiations/:id", async (req, res): Promise<void> => {
     return;
   }
   res.json(formatNeg(neg));
+});
+
+// Default lifecycle of tasks seeded when a lead is converted to a project.
+// Each task is offset (in days) from the project start. Phase=parent grouper.
+const PROJECT_LIFECYCLE: Array<{
+  title: string;
+  description: string;
+  startOffset: number;
+  durationDays: number;
+  phase: string;
+}> = [
+  {
+    title: "Project kickoff & contract sign-off",
+    description: "Confirm scope, sign contract, mobilize core team.",
+    startOffset: 0,
+    durationDays: 7,
+    phase: "Initiation",
+  },
+  {
+    title: "Site mobilization & survey",
+    description: "Set up site office, fencing, utilities; topographic survey.",
+    startOffset: 5,
+    durationDays: 14,
+    phase: "Initiation",
+  },
+  {
+    title: "Statutory approvals & permits",
+    description: "Building permit, environmental clearance, labour licence.",
+    startOffset: 7,
+    durationDays: 30,
+    phase: "Planning",
+  },
+  {
+    title: "Detailed design & engineering",
+    description: "GFC drawings, MEP coordination, structural analysis.",
+    startOffset: 14,
+    durationDays: 45,
+    phase: "Planning",
+  },
+  {
+    title: "Procurement of long-lead materials",
+    description: "Issue PO for steel, lifts, DG sets, HVAC equipment.",
+    startOffset: 30,
+    durationDays: 60,
+    phase: "Procurement",
+  },
+  {
+    title: "Foundation & substructure",
+    description: "Excavation, raft/PCC, columns up to plinth.",
+    startOffset: 45,
+    durationDays: 60,
+    phase: "Execution",
+  },
+  {
+    title: "Superstructure works",
+    description: "Slabs, columns, beams, masonry up to terrace.",
+    startOffset: 90,
+    durationDays: 120,
+    phase: "Execution",
+  },
+  {
+    title: "MEP rough-in",
+    description: "Conduiting, plumbing risers, HVAC ducting.",
+    startOffset: 150,
+    durationDays: 60,
+    phase: "Execution",
+  },
+  {
+    title: "Finishes & interiors",
+    description: "Plaster, paint, flooring, false ceiling, joinery.",
+    startOffset: 210,
+    durationDays: 60,
+    phase: "Execution",
+  },
+  {
+    title: "Testing, commissioning & snagging",
+    description: "Run all systems, snag list resolution, statutory NOCs.",
+    startOffset: 270,
+    durationDays: 21,
+    phase: "Closeout",
+  },
+  {
+    title: "Client handover & DLP start",
+    description:
+      "Final walkthrough, key handover, O&M manuals, defect liability period begins.",
+    startOffset: 290,
+    durationDays: 7,
+    phase: "Closeout",
+  },
+];
+
+const addDays = (base: Date, days: number): string => {
+  const d = new Date(base);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+};
+
+router.post("/leads/:id/convert", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id as string, 10);
+  const body = req.body ?? {};
+  const me = await getCurrentUser();
+
+  const [lead] = await db
+    .select()
+    .from(leadsTable)
+    .where(eq(leadsTable.id, id));
+  if (!lead) {
+    res.status(404).json({ error: "Lead not found" });
+    return;
+  }
+  if (lead.wonProjectId) {
+    res.status(409).json({
+      error: "Lead already converted",
+      projectId: lead.wonProjectId,
+    });
+    return;
+  }
+
+  // Pick a sensible project name & start date.
+  const projectName: string =
+    (typeof body.projectName === "string" && body.projectName.trim()) ||
+    `${lead.customerName}${
+      lead.projectType ? ` — ${lead.projectType}` : ""
+    }`;
+  const startDateStr: string =
+    (typeof body.startDate === "string" && body.startDate) ||
+    new Date().toISOString().slice(0, 10);
+  const startBase = new Date(`${startDateStr}T00:00:00.000Z`);
+  const fallbackEnd = addDays(startBase, 300);
+  const endDateStr: string =
+    (typeof body.endDate === "string" && body.endDate) || fallbackEnd;
+
+  // Try to source the budget from the latest BOQ (sum of grandTotal).
+  const leadBoqs = await db
+    .select()
+    .from(boqsTable)
+    .where(eq(boqsTable.leadId, lead.id))
+    .orderBy(desc(boqsTable.version));
+  const latestBoq = leadBoqs[0];
+  const budgetFromBoq = latestBoq ? num(latestBoq.grandTotal) : null;
+  const projectBudget =
+    budgetFromBoq ?? num(lead.budgetEstimate as unknown) ?? null;
+
+  // 1. Create the project.
+  const [project] = await db
+    .insert(projectsTable)
+    .values({
+      name: projectName,
+      type: lead.projectType ?? null,
+      location: lead.location ?? null,
+      clientName: (lead.company as string | null) ?? lead.customerName,
+      startDate: startDateStr,
+      endDate: endDateStr,
+      budget: projectBudget != null ? String(projectBudget) : null,
+      description: `Converted from lead ${lead.leadNumber}.`,
+      status: "planning",
+      progress: 0,
+      teamSize: null,
+      createdById: me.id,
+    })
+    .returning();
+  if (!project) {
+    res.status(500).json({ error: "Failed to create project" });
+    return;
+  }
+
+  // 2. Add the lead's customer as the primary client stakeholder.
+  await db.insert(stakeholdersTable).values({
+    projectId: project.id,
+    name: lead.customerName,
+    email: (lead.contactEmail as string | null) ?? null,
+    phone: (lead.contactPhone as string | null) ?? null,
+    organization: (lead.company as string | null) ?? null,
+    role: "Client",
+    accessLevel: "read",
+  });
+
+  // 3. Seed budget items from the latest BOQ items if any, else a single line.
+  if (latestBoq) {
+    const items = await db
+      .select()
+      .from(boqItemsTable)
+      .where(eq(boqItemsTable.boqId, latestBoq.id));
+    if (items.length) {
+      // Group BOQ items by category (or "General") and budget the total.
+      const grouped = new Map<string, number>();
+      for (const it of items) {
+        const cat = ((it.category as string | null) ?? "General").trim();
+        const amt = num(it.totalPrice) ?? 0;
+        grouped.set(cat, (grouped.get(cat) ?? 0) + amt);
+      }
+      let i = 1;
+      for (const [cat, total] of grouped) {
+        await db.insert(budgetItemsTable).values({
+          projectId: project.id,
+          costCode: `BOQ-${String(i).padStart(3, "0")}`,
+          description: cat,
+          budgeted: total.toFixed(2),
+          actual: "0",
+          committed: "0",
+        });
+        i += 1;
+      }
+    } else if (projectBudget != null) {
+      await db.insert(budgetItemsTable).values({
+        projectId: project.id,
+        costCode: "BOQ-001",
+        description: "Project total (from BOQ)",
+        budgeted: projectBudget.toFixed(2),
+        actual: "0",
+        committed: "0",
+      });
+    }
+  } else if (projectBudget != null) {
+    await db.insert(budgetItemsTable).values({
+      projectId: project.id,
+      costCode: "EST-001",
+      description: "Initial estimate (from lead)",
+      budgeted: projectBudget.toFixed(2),
+      actual: "0",
+      committed: "0",
+    });
+  }
+
+  // 4. Seed the lifecycle of tasks.
+  for (const tpl of PROJECT_LIFECYCLE) {
+    const taskStart = addDays(startBase, tpl.startOffset);
+    const taskEnd = addDays(startBase, tpl.startOffset + tpl.durationDays);
+    await db.insert(tasksTable).values({
+      projectId: project.id,
+      title: tpl.title,
+      description: `[${tpl.phase}] ${tpl.description}`,
+      assignedToId: null,
+      startDate: taskStart,
+      endDate: taskEnd,
+      priority: "medium",
+      status: "todo",
+      progress: 0,
+      parentTaskId: null,
+      createdById: me.id,
+    });
+  }
+
+  // 5. Mark the lead as won and link to the new project.
+  await db
+    .update(leadsTable)
+    .set({
+      status: "won",
+      stage: "won",
+      wonProjectId: project.id,
+    })
+    .where(eq(leadsTable.id, lead.id));
+
+  // 6. Audit log + notification.
+  await db.insert(auditLogsTable).values({
+    userId: me.id,
+    activity: `Converted lead ${lead.leadNumber} → project ${project.name}`,
+    resourceType: "project",
+    resourceId: project.id,
+    status: "success",
+    metadata: JSON.stringify({
+      leadId: lead.id,
+      leadNumber: lead.leadNumber,
+      projectId: project.id,
+    }),
+  });
+  await db.insert(notificationsTable).values({
+    userId: lead.ownerId ?? me.id,
+    notificationType: "project_created",
+    title: "Lead converted to project",
+    message: `${lead.customerName} (${lead.leadNumber}) is now project "${project.name}". A ${PROJECT_LIFECYCLE.length}-step lifecycle has been seeded.`,
+  });
+
+  res.status(201).json(numKeys(project, ["budget"]));
 });
 
 export default router;

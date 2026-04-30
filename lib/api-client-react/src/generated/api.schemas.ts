@@ -257,6 +257,15 @@ export interface LeadInput {
   notes?: string | null;
 }
 
+export interface LeadConvertInput {
+  /** @nullable */
+  projectName?: string | null;
+  /** @nullable */
+  startDate?: string | null;
+  /** @nullable */
+  endDate?: string | null;
+}
+
 export interface LeadActivity {
   id: number;
   leadId: number;

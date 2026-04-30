@@ -138,6 +138,22 @@ paths:
       operationId: getLeadsSummary
       tags: [leads]
       responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/LeadsSummary" } } } } }
+  /leads/{id}/convert:
+    post:
+      operationId: convertLead
+      tags: [leads]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LeadConvertInput" }
+      responses:
+        "201":
+          description: Lead converted; project created with seeded lifecycle tasks
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Project" }
 
   /leads/{leadId}/activities:
     get:
@@ -735,6 +751,12 @@ components:
         expectedClosureDate: { type: ["string", "null"], format: date }
         wonProjectId: { type: ["integer", "null"] }
         notes: { type: ["string", "null"] }
+    LeadConvertInput:
+      type: object
+      properties:
+        projectName: { type: ["string", "null"] }
+        startDate: { type: ["string", "null"], format: date }
+        endDate: { type: ["string", "null"], format: date }
     LeadDetail:
       allOf:
         - $ref: "#/components/schemas/Lead"
