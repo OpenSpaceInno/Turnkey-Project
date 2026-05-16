@@ -757,6 +757,91 @@ export type ProjectDetail = Project & {
   stakeholders?: Stakeholder[];
 };
 
+export interface TaskTemplate {
+  id: number;
+  name: string;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  projectType?: string | null;
+  isDefault?: boolean;
+  itemCount: number;
+  /** @nullable */
+  createdById?: number | null;
+  createdAt: string;
+}
+
+export type TaskTemplateItemPriority =
+  (typeof TaskTemplateItemPriority)[keyof typeof TaskTemplateItemPriority];
+
+export const TaskTemplateItemPriority = {
+  high: "high",
+  medium: "medium",
+  low: "low",
+} as const;
+
+export interface TaskTemplateItem {
+  id: number;
+  templateId: number;
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  phase?: string | null;
+  priority: TaskTemplateItemPriority;
+  /** @nullable */
+  estimatedDays?: number | null;
+  sortOrder: number;
+  createdAt?: string;
+}
+
+export type TaskTemplateDetail = TaskTemplate & {
+  items: TaskTemplateItem[];
+};
+
+export interface TaskTemplateInput {
+  name: string;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  projectType?: string | null;
+  /** @nullable */
+  isDefault?: boolean | null;
+}
+
+/**
+ * @nullable
+ */
+export type TaskTemplateItemInputPriority =
+  | (typeof TaskTemplateItemInputPriority)[keyof typeof TaskTemplateItemInputPriority]
+  | null;
+
+export const TaskTemplateItemInputPriority = {
+  high: "high",
+  medium: "medium",
+  low: "low",
+} as const;
+
+export interface TaskTemplateItemInput {
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  phase?: string | null;
+  /** @nullable */
+  priority?: TaskTemplateItemInputPriority;
+  /** @nullable */
+  estimatedDays?: number | null;
+  /** @nullable */
+  sortOrder?: number | null;
+}
+
+export interface ApplyTemplateInput {
+  projectId: number;
+  /** @nullable */
+  startDate?: string | null;
+}
+
 /**
  * @nullable
  */
@@ -1986,6 +2071,10 @@ export interface AuditLog {
   metadata?: string | null;
   createdAt: string;
 }
+
+export type ApplyTaskTemplate200 = {
+  tasksCreated?: number;
+};
 
 export type ListTasksParams = {
   projectId?: number;

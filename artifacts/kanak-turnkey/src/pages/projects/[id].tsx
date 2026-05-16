@@ -12,6 +12,9 @@ import {
   useCreatePunchListItem,
   useUpdatePunchListItem,
   useUpdateProject,
+  useListTaskTemplates,
+  useGetTaskTemplate, getGetTaskTemplateQueryKey,
+  useApplyTaskTemplate,
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -29,7 +32,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   ChevronLeft, Plus, FileText, CheckCircle2, Circle, Clock,
-  AlertCircle, CheckCheck, ArrowRight, ClipboardList,
+  AlertCircle, CheckCheck, ArrowRight, ClipboardList, LayoutTemplate,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -88,6 +91,16 @@ export default function ProjectDetail() {
   const [advanceOpen, setAdvanceOpen] = useState(false);
   const [punchOpen, setPunchOpen] = useState(false);
   const [punchForm, setPunchForm] = useState({ title: "", description: "", category: "general", priority: "medium", dueDate: "" });
+  const [applyOpen, setApplyOpen] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
+  const [applyStartDate, setApplyStartDate] = useState(format(new Date(), "yyyy-MM-dd"));
+
+  const { data: templates } = useListTaskTemplates();
+  const { data: previewTemplate } = useGetTaskTemplate(
+    selectedTemplateId ? parseInt(selectedTemplateId) : 0,
+    { query: { enabled: !!selectedTemplateId, queryKey: getGetTaskTemplateQueryKey(selectedTemplateId ? parseInt(selectedTemplateId) : 0) } }
+  );
+  const applyTemplate = useApplyTaskTemplate();
 
   if (isLoading) return <div className="p-6">Loading project details...</div>;
   if (!project)  return <div className="p-6 text-destructive">Project not found</div>;
@@ -132,6 +145,17 @@ export default function ProjectDetail() {
   const handlePunchStatus = async (itemId: number, status: string) => {
     await updatePunch.mutateAsync({ id: itemId, data: { status: status as "open" | "in_progress" | "resolved" | "closed" } });
     await qc.invalidateQueries({ queryKey: getListPunchListItemsQueryKey({ projectId }) });
+  };
+
+  const handleApplyTemplate = async () => {
+    if (!selectedTemplateId) return;
+    await applyTemplate.mutateAsync({
+      id: parseInt(selectedTemplateId),
+      data: { projectId, startDate: applyStartDate || null },
+    });
+    await qc.invalidateQueries({ queryKey: getListTasksQueryKey({ projectId }) });
+    setApplyOpen(false);
+    setSelectedTemplateId("");
   };
 
   return (
@@ -343,33 +367,138 @@ export default function ProjectDetail() {
 
               {/* ── Tasks ── */}
               <TabsContent value="tasks" className="m-0 space-y-4">
-                <div className="flex justify-end">
-                  <Button size="sm"><Plus className="w-4 h-4 mr-2" /> Add Task</Button>
-                </div>
-                <div className="grid gap-4 md:grid-cols-3">
-                  {["todo", "in_progress", "completed"].map(status => {
-                    const st = projectTasks.filter(t => t.status === status);
-                    return (
-                      <div key={status} className="bg-muted/50 p-4 rounded-lg space-y-3">
-                        <h3 className="font-semibold text-sm capitalize flex items-center justify-between">
-                          {status.replace("_", " ")} <Badge variant="secondary">{st.length}</Badge>
-                        </h3>
-                        {st.map(task => (
-                          <Card key={task.id} className="p-3 shadow-sm hover:border-primary/50 cursor-pointer transition-colors">
-                            <div className="font-medium text-sm mb-1">{task.title}</div>
-                            <div className="flex justify-between items-center text-xs text-muted-foreground mt-2">
-                              <span>{task.assignedToName || "Unassigned"}</span>
-                              <Badge variant="outline" className="text-[10px] h-4">{task.priority}</Badge>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-sm text-muted-foreground">
+                    {projectTasks.filter(t => t.status === "completed").length}/{projectTasks.length} tasks complete
+                  </div>
+                  <div className="flex gap-2">
+                    {/* Apply Template Dialog */}
+                    <Dialog open={applyOpen} onOpenChange={o => { setApplyOpen(o); if (!o) setSelectedTemplateId(""); }}>
+                      <DialogTrigger asChild>
+                        <Button size="sm" variant="outline" className="gap-2">
+                          <LayoutTemplate className="h-4 w-4" /> Apply Template
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+                        <DialogHeader>
+                          <DialogTitle>Apply Task Template</DialogTitle>
+                          <DialogDescription>
+                            Select a master template to generate a full task plan for this project. Tasks are sequenced automatically from the start date.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 overflow-y-auto flex-1 pr-1">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Template *</Label>
+                              <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
+                                <SelectTrigger><SelectValue placeholder="Choose template…" /></SelectTrigger>
+                                <SelectContent>
+                                  {templates?.map(t => (
+                                    <SelectItem key={t.id} value={String(t.id)}>
+                                      {t.name} ({t.itemCount} tasks)
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                             </div>
-                          </Card>
-                        ))}
-                        {st.length === 0 && (
-                          <div className="text-xs text-center text-muted-foreground py-4 border border-dashed rounded bg-background/50">Empty</div>
-                        )}
-                      </div>
-                    );
-                  })}
+                            <div className="space-y-1.5">
+                              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Start date</Label>
+                              <Input
+                                type="date"
+                                value={applyStartDate}
+                                onChange={e => setApplyStartDate(e.target.value)}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Template preview */}
+                          {previewTemplate && (
+                            <div className="rounded-md border bg-muted/30 overflow-hidden">
+                              <div className="px-4 py-2 bg-muted border-b flex items-center justify-between">
+                                <span className="text-sm font-medium">{previewTemplate.name}</span>
+                                <Badge variant="outline">{previewTemplate.itemCount} tasks</Badge>
+                              </div>
+                              <div className="p-3 max-h-64 overflow-y-auto space-y-3">
+                                {(() => {
+                                  const grouped = previewTemplate.items.reduce<Record<string, typeof previewTemplate.items>>((acc, item) => {
+                                    const ph = item.phase ?? "General";
+                                    (acc[ph] ??= []).push(item);
+                                    return acc;
+                                  }, {});
+                                  return Object.entries(grouped).map(([phase, items]) => (
+                                    <div key={phase}>
+                                      <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">{phase}</div>
+                                      <div className="space-y-1">
+                                        {items!.map(item => (
+                                          <div key={item.id} className="flex items-center gap-2 text-xs py-1 px-2 rounded bg-background/60">
+                                            <span className="flex-1">{item.title}</span>
+                                            {item.estimatedDays && <span className="text-muted-foreground shrink-0">~{item.estimatedDays}d</span>}
+                                            <Badge variant={item.priority === "high" ? "destructive" : item.priority === "medium" ? "secondary" : "outline"} className="text-[10px] shrink-0">{item.priority}</Badge>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  ));
+                                })()}
+                              </div>
+                            </div>
+                          )}
+                          {selectedTemplateId && !previewTemplate && (
+                            <div className="text-sm text-muted-foreground text-center py-4">Loading preview…</div>
+                          )}
+                        </div>
+                        <DialogFooter className="pt-2 border-t">
+                          <Button variant="outline" onClick={() => setApplyOpen(false)}>Cancel</Button>
+                          <Button
+                            onClick={handleApplyTemplate}
+                            disabled={!selectedTemplateId || applyTemplate.isPending}
+                          >
+                            {applyTemplate.isPending
+                              ? "Generating tasks…"
+                              : `Apply${previewTemplate ? ` (${previewTemplate.itemCount} tasks)` : ""}`}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                    <Button size="sm"><Plus className="w-4 h-4 mr-2" /> Add Task</Button>
+                  </div>
                 </div>
+
+                {projectTasks.length === 0 ? (
+                  <div className="rounded-md border border-dashed p-12 text-center space-y-3 text-muted-foreground">
+                    <LayoutTemplate className="h-10 w-10 mx-auto opacity-30" />
+                    <p className="font-medium">No tasks yet</p>
+                    <p className="text-sm">Apply a template to generate a complete task plan in one click, or add tasks manually.</p>
+                    <Button size="sm" variant="outline" className="gap-2 mt-2" onClick={() => setApplyOpen(true)}>
+                      <LayoutTemplate className="h-4 w-4" /> Apply Template
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-3">
+                    {["todo", "in_progress", "completed"].map(status => {
+                      const st = projectTasks.filter(t => t.status === status);
+                      return (
+                        <div key={status} className="bg-muted/50 p-4 rounded-lg space-y-3">
+                          <h3 className="font-semibold text-sm capitalize flex items-center justify-between">
+                            {status.replace("_", " ")} <Badge variant="secondary">{st.length}</Badge>
+                          </h3>
+                          {st.map(task => (
+                            <Card key={task.id} className="p-3 shadow-sm hover:border-primary/50 cursor-pointer transition-colors">
+                              <div className="font-medium text-sm mb-1">{task.title}</div>
+                              <div className="flex justify-between items-center text-xs text-muted-foreground mt-2">
+                                <span>{task.assignedToName || "Unassigned"}</span>
+                                <Badge variant="outline" className="text-[10px] h-4">{task.priority}</Badge>
+                              </div>
+                            </Card>
+                          ))}
+                          {st.length === 0 && (
+                            <div className="text-xs text-center text-muted-foreground py-4 border border-dashed rounded bg-background/50">Empty</div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </TabsContent>
 
               {/* ── Punch List ── */}

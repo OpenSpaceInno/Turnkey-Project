@@ -20,6 +20,7 @@ import Notifications from "@/pages/notifications/index";
 import AuditLogs from "@/pages/audit-logs/index";
 import Admin from "@/pages/admin/index";
 import Settings from "@/pages/settings/index";
+import TaskTemplates from "@/pages/task-templates/index";
 
 const queryClient = new QueryClient();
 
@@ -36,6 +37,7 @@ function Router() {
         <Route path="/projects/:id" component={ProjectDetail} />
         
         <Route path="/tasks" component={Tasks} />
+        <Route path="/task-templates" component={TaskTemplates} />
         <Route path="/finance" component={Finance} />
         <Route path="/procurement" component={Procurement} />
         <Route path="/communications" component={Communications} />

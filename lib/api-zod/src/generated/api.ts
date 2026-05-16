@@ -1053,6 +1053,157 @@ export const DeleteProjectParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const ListTaskTemplatesResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  description: zod.string().nullish(),
+  projectType: zod.string().nullish(),
+  isDefault: zod.boolean().optional(),
+  itemCount: zod.number(),
+  createdById: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+});
+export const ListTaskTemplatesResponse = zod.array(
+  ListTaskTemplatesResponseItem,
+);
+
+export const CreateTaskTemplateBody = zod.object({
+  name: zod.string(),
+  description: zod.string().nullish(),
+  projectType: zod.string().nullish(),
+  isDefault: zod.boolean().nullish(),
+});
+
+export const GetTaskTemplateParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetTaskTemplateResponse = zod
+  .object({
+    id: zod.number(),
+    name: zod.string(),
+    description: zod.string().nullish(),
+    projectType: zod.string().nullish(),
+    isDefault: zod.boolean().optional(),
+    itemCount: zod.number(),
+    createdById: zod.number().nullish(),
+    createdAt: zod.coerce.date(),
+  })
+  .and(
+    zod.object({
+      items: zod.array(
+        zod.object({
+          id: zod.number(),
+          templateId: zod.number(),
+          title: zod.string(),
+          description: zod.string().nullish(),
+          phase: zod.string().nullish(),
+          priority: zod.enum(["high", "medium", "low"]),
+          estimatedDays: zod.number().nullish(),
+          sortOrder: zod.number(),
+          createdAt: zod.coerce.date().optional(),
+        }),
+      ),
+    }),
+  );
+
+export const UpdateTaskTemplateParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateTaskTemplateBody = zod.object({
+  name: zod.string(),
+  description: zod.string().nullish(),
+  projectType: zod.string().nullish(),
+  isDefault: zod.boolean().nullish(),
+});
+
+export const UpdateTaskTemplateResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  description: zod.string().nullish(),
+  projectType: zod.string().nullish(),
+  isDefault: zod.boolean().optional(),
+  itemCount: zod.number(),
+  createdById: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+});
+
+export const DeleteTaskTemplateParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const CreateTaskTemplateItemParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const CreateTaskTemplateItemBody = zod.object({
+  title: zod.string(),
+  description: zod.string().nullish(),
+  phase: zod.string().nullish(),
+  priority: zod
+    .union([
+      zod.literal("high"),
+      zod.literal("medium"),
+      zod.literal("low"),
+      zod.literal(null),
+    ])
+    .nullish(),
+  estimatedDays: zod.number().nullish(),
+  sortOrder: zod.number().nullish(),
+});
+
+export const UpdateTaskTemplateItemParams = zod.object({
+  id: zod.coerce.number(),
+  itemId: zod.coerce.number(),
+});
+
+export const UpdateTaskTemplateItemBody = zod.object({
+  title: zod.string(),
+  description: zod.string().nullish(),
+  phase: zod.string().nullish(),
+  priority: zod
+    .union([
+      zod.literal("high"),
+      zod.literal("medium"),
+      zod.literal("low"),
+      zod.literal(null),
+    ])
+    .nullish(),
+  estimatedDays: zod.number().nullish(),
+  sortOrder: zod.number().nullish(),
+});
+
+export const UpdateTaskTemplateItemResponse = zod.object({
+  id: zod.number(),
+  templateId: zod.number(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  phase: zod.string().nullish(),
+  priority: zod.enum(["high", "medium", "low"]),
+  estimatedDays: zod.number().nullish(),
+  sortOrder: zod.number(),
+  createdAt: zod.coerce.date().optional(),
+});
+
+export const DeleteTaskTemplateItemParams = zod.object({
+  id: zod.coerce.number(),
+  itemId: zod.coerce.number(),
+});
+
+export const ApplyTaskTemplateParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ApplyTaskTemplateBody = zod.object({
+  projectId: zod.number(),
+  startDate: zod.coerce.date().nullish(),
+});
+
+export const ApplyTaskTemplateResponse = zod.object({
+  tasksCreated: zod.number().optional(),
+});
+
 export const ListTasksQueryParams = zod.object({
   projectId: zod.coerce.number().optional(),
 });

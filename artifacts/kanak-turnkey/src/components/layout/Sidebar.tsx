@@ -11,7 +11,8 @@ import {
   FileText, 
   Bell, 
   Settings,
-  ShieldAlert
+  ShieldAlert,
+  LayoutTemplate,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useGetCurrentUser } from "@workspace/api-client-react";
@@ -25,6 +26,7 @@ export function Sidebar() {
     { name: "Leads", href: "/leads", icon: Users },
     { name: "Projects", href: "/projects", icon: Briefcase },
     { name: "Tasks", href: "/tasks", icon: CheckSquare },
+    { name: "Task Templates", href: "/task-templates", icon: LayoutTemplate },
     { name: "Finance", href: "/finance", icon: DollarSign },
     { name: "Procurement", href: "/procurement", icon: ShoppingCart },
     { name: "Communications", href: "/communications", icon: MessageSquare },

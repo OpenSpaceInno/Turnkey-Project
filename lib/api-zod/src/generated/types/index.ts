@@ -7,6 +7,8 @@
  */
 
 export * from "./activityItem";
+export * from "./applyTaskTemplate200";
+export * from "./applyTemplateInput";
 export * from "./auditLog";
 export * from "./boq";
 export * from "./boqDetail";
@@ -156,6 +158,13 @@ export * from "./taskInputPriority";
 export * from "./taskInputStatus";
 export * from "./taskPriority";
 export * from "./taskStatus";
+export * from "./taskTemplate";
+export * from "./taskTemplateDetail";
+export * from "./taskTemplateInput";
+export * from "./taskTemplateItem";
+export * from "./taskTemplateItemInput";
+export * from "./taskTemplateItemInputPriority";
+export * from "./taskTemplateItemPriority";
 export * from "./updateRolesRequest";
 export * from "./user";
 export * from "./userActiveRole";

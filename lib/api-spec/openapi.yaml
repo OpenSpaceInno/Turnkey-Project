@@ -25,6 +25,7 @@ tags:
   - name: vendor-invoices
   - name: financial-instruments
   - name: vendors
+  - name: task-templates
   - name: material-requests
   - name: rfqs
   - name: purchase-orders
@@ -293,6 +294,64 @@ paths:
       tags: [projects]
       parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
       responses: { "204": { description: ok } }
+
+  /task-templates:
+    get:
+      operationId: listTaskTemplates
+      tags: [task-templates]
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/TaskTemplate" } } } } } }
+    post:
+      operationId: createTaskTemplate
+      tags: [task-templates]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/TaskTemplateInput" } } } }
+      responses: { "201": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/TaskTemplate" } } } } }
+  /task-templates/{id}:
+    get:
+      operationId: getTaskTemplate
+      tags: [task-templates]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/TaskTemplateDetail" } } } } }
+    patch:
+      operationId: updateTaskTemplate
+      tags: [task-templates]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/TaskTemplateInput" } } } }
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/TaskTemplate" } } } } }
+    delete:
+      operationId: deleteTaskTemplate
+      tags: [task-templates]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { "204": { description: ok } }
+  /task-templates/{id}/items:
+    post:
+      operationId: createTaskTemplateItem
+      tags: [task-templates]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/TaskTemplateItemInput" } } } }
+      responses: { "201": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/TaskTemplateItem" } } } } }
+  /task-templates/{id}/items/{itemId}:
+    patch:
+      operationId: updateTaskTemplateItem
+      tags: [task-templates]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { name: itemId, in: path, required: true, schema: { type: integer } }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/TaskTemplateItemInput" } } } }
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/TaskTemplateItem" } } } } }
+    delete:
+      operationId: deleteTaskTemplateItem
+      tags: [task-templates]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { name: itemId, in: path, required: true, schema: { type: integer } }
+      responses: { "204": { description: ok } }
+  /task-templates/{id}/apply:
+    post:
+      operationId: applyTaskTemplate
+      tags: [task-templates]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ApplyTemplateInput" } } } }
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: object, properties: { tasksCreated: { type: integer } } } } } } }
 
   /tasks:
     get:
@@ -1024,6 +1083,65 @@ components:
             tasks: { type: array, items: { $ref: "#/components/schemas/Task" } }
             budgetItems: { type: array, items: { $ref: "#/components/schemas/BudgetItem" } }
             stakeholders: { type: array, items: { $ref: "#/components/schemas/Stakeholder" } }
+
+    TaskTemplate:
+      type: object
+      required: [id, name, itemCount, createdAt]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        description: { type: ["string", "null"] }
+        projectType: { type: ["string", "null"] }
+        isDefault: { type: boolean }
+        itemCount: { type: integer }
+        createdById: { type: ["integer", "null"] }
+        createdAt: { type: string, format: date-time }
+    TaskTemplateDetail:
+      allOf:
+        - { $ref: "#/components/schemas/TaskTemplate" }
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/TaskTemplateItem" }
+    TaskTemplateInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        description: { type: ["string", "null"] }
+        projectType: { type: ["string", "null"] }
+        isDefault: { type: ["boolean", "null"] }
+    TaskTemplateItem:
+      type: object
+      required: [id, templateId, title, priority, sortOrder]
+      properties:
+        id: { type: integer }
+        templateId: { type: integer }
+        title: { type: string }
+        description: { type: ["string", "null"] }
+        phase: { type: ["string", "null"] }
+        priority: { type: string, enum: [high, medium, low] }
+        estimatedDays: { type: ["integer", "null"] }
+        sortOrder: { type: integer }
+        createdAt: { type: string, format: date-time }
+    TaskTemplateItemInput:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string }
+        description: { type: ["string", "null"] }
+        phase: { type: ["string", "null"] }
+        priority: { type: ["string", "null"], enum: [high, medium, low, null] }
+        estimatedDays: { type: ["integer", "null"] }
+        sortOrder: { type: ["integer", "null"] }
+    ApplyTemplateInput:
+      type: object
+      required: [projectId]
+      properties:
+        projectId: { type: integer }
+        startDate: { type: ["string", "null"], format: date }
 
     Task:
       type: object

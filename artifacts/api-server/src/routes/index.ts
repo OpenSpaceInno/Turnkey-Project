@@ -8,6 +8,7 @@ import financeRouter from "./finance";
 import procurementRouter from "./procurement";
 import communicationRouter from "./communication";
 import systemRouter from "./system";
+import taskTemplatesRouter from "./task-templates";
 
 const router: IRouter = Router();
 
@@ -19,6 +20,7 @@ router.use(projectsRouter);
 router.use(financeRouter);
 router.use(procurementRouter);
 router.use(communicationRouter);
+router.use(taskTemplatesRouter);
 router.use(systemRouter);
 
 export default router;

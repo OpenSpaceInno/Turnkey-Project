@@ -440,6 +440,28 @@ export const notificationsTable = pgTable("notifications", {
     .defaultNow(),
 });
 
+export const taskTemplatesTable = pgTable("task_templates", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  projectType: varchar("project_type", { length: 128 }),
+  isDefault: boolean("is_default").notNull().default(false),
+  createdById: integer("created_by_id"),
+  ...ts(),
+});
+
+export const taskTemplateItemsTable = pgTable("task_template_items", {
+  id: serial("id").primaryKey(),
+  templateId: integer("template_id").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  phase: varchar("phase", { length: 128 }),
+  priority: varchar("priority", { length: 16 }).notNull().default("medium"),
+  estimatedDays: integer("estimated_days"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const auditLogsTable = pgTable("audit_logs", {
   id: serial("id").primaryKey(),
   userId: integer("user_id"),
