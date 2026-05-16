@@ -8,6 +8,7 @@ import {
   raBillsTable,
   stakeholdersTable,
   usersTable,
+  punchListItemsTable,
 } from "@workspace/db";
 import { numKeys } from "../lib/transforms";
 import { getCurrentUser } from "../lib/session";
@@ -195,6 +196,87 @@ router.patch("/tasks/:id", async (req, res): Promise<void> => {
 router.delete("/tasks/:id", async (req, res): Promise<void> => {
   const id = parseInt(req.params.id as string, 10);
   await db.delete(tasksTable).where(eq(tasksTable.id, id));
+  res.sendStatus(204);
+});
+
+// Punch List Items
+router.get("/punch-list-items", async (req, res): Promise<void> => {
+  const projectId = req.query.projectId
+    ? parseInt(req.query.projectId as string, 10)
+    : null;
+  const baseQuery = db
+    .select({ p: punchListItemsTable, pn: projectsTable.name, un: usersTable.name })
+    .from(punchListItemsTable)
+    .leftJoin(projectsTable, eq(projectsTable.id, punchListItemsTable.projectId))
+    .leftJoin(usersTable, eq(usersTable.id, punchListItemsTable.assignedToId));
+  const rows = projectId
+    ? await baseQuery
+        .where(eq(punchListItemsTable.projectId, projectId))
+        .orderBy(desc(punchListItemsTable.createdAt))
+    : await baseQuery.orderBy(desc(punchListItemsTable.createdAt));
+  res.json(rows.map((r) => ({ ...r.p, projectName: r.pn, assignedToName: r.un })));
+});
+
+router.post("/punch-list-items", async (req, res): Promise<void> => {
+  const b = req.body ?? {};
+  if (!b.projectId || !b.title) {
+    res.status(400).json({ error: "projectId and title required" });
+    return;
+  }
+  const me = await getCurrentUser();
+  const [item] = await db
+    .insert(punchListItemsTable)
+    .values({
+      projectId: b.projectId,
+      title: b.title,
+      description: b.description ?? null,
+      category: b.category ?? "general",
+      priority: b.priority ?? "medium",
+      status: "open",
+      assignedToId: b.assignedToId ?? null,
+      dueDate: b.dueDate ?? null,
+      createdById: me.id,
+    })
+    .returning();
+  const [row] = await db
+    .select({ p: punchListItemsTable, pn: projectsTable.name, un: usersTable.name })
+    .from(punchListItemsTable)
+    .leftJoin(projectsTable, eq(projectsTable.id, punchListItemsTable.projectId))
+    .leftJoin(usersTable, eq(usersTable.id, punchListItemsTable.assignedToId))
+    .where(eq(punchListItemsTable.id, item!.id));
+  res.status(201).json({ ...row!.p, projectName: row!.pn, assignedToName: row!.un });
+});
+
+router.patch("/punch-list-items/:id", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id as string, 10);
+  const b = req.body ?? {};
+  const update: Record<string, unknown> = {};
+  for (const k of ["title", "description", "category", "priority", "status", "assignedToId", "dueDate"]) {
+    if (b[k] !== undefined) update[k] = b[k];
+  }
+  if (b.status === "resolved" || b.status === "closed") {
+    const me = await getCurrentUser();
+    update.resolvedAt = new Date();
+    update.resolvedById = me.id;
+  }
+  const [item] = await db
+    .update(punchListItemsTable)
+    .set(update)
+    .where(eq(punchListItemsTable.id, id))
+    .returning();
+  if (!item) { res.status(404).json({ error: "Not found" }); return; }
+  const [row] = await db
+    .select({ p: punchListItemsTable, pn: projectsTable.name, un: usersTable.name })
+    .from(punchListItemsTable)
+    .leftJoin(projectsTable, eq(projectsTable.id, punchListItemsTable.projectId))
+    .leftJoin(usersTable, eq(usersTable.id, punchListItemsTable.assignedToId))
+    .where(eq(punchListItemsTable.id, id));
+  res.json({ ...row!.p, projectName: row!.pn, assignedToName: row!.un });
+});
+
+router.delete("/punch-list-items/:id", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id as string, 10);
+  await db.delete(punchListItemsTable).where(eq(punchListItemsTable.id, id));
   res.sendStatus(204);
 });
 

@@ -10,6 +10,11 @@ export type ProjectStatus = (typeof ProjectStatus)[keyof typeof ProjectStatus];
 
 export const ProjectStatus = {
   planning: "planning",
+  procurement: "procurement",
+  execution: "execution",
+  qc: "qc",
+  handover: "handover",
+  archived: "archived",
   in_progress: "in_progress",
   on_hold: "on_hold",
   completed: "completed",

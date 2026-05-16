@@ -412,6 +412,22 @@ export const documentsTable = pgTable("documents", {
     .defaultNow(),
 });
 
+export const punchListItemsTable = pgTable("punch_list_items", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  category: varchar("category", { length: 64 }).notNull().default("general"),
+  priority: varchar("priority", { length: 16 }).notNull().default("medium"),
+  status: varchar("status", { length: 32 }).notNull().default("open"),
+  assignedToId: integer("assigned_to_id"),
+  dueDate: date("due_date"),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  resolvedById: integer("resolved_by_id"),
+  createdById: integer("created_by_id"),
+  ...ts(),
+});
+
 export const notificationsTable = pgTable("notifications", {
   id: serial("id").primaryKey(),
   userId: integer("user_id"),

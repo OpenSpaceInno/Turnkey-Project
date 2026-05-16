@@ -5,12 +5,14 @@ import {
   useCreatePurchaseOrder,
   useCreateRfq,
   useCreateMaterial,
+  useCreateMaterialRequest,
   useListProjects,
   useListVendors,
   getListVendorsQueryKey,
   getListPurchaseOrdersQueryKey,
   getListRfqsQueryKey,
   getListMaterialsQueryKey,
+  getListMaterialRequestsQueryKey,
 } from "@workspace/api-client-react";
 import {
   Dialog,
@@ -618,6 +620,112 @@ export function NewMaterialDialog({ trigger }: { trigger: ReactNode }) {
             }
           >
             {create.isPending ? "Saving..." : "Add material"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function NewMaterialRequestDialog({ trigger }: { trigger: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const qc = useQueryClient();
+  const create = useCreateMaterialRequest();
+  const { data: projects } = useListProjects();
+
+  const [form, setForm] = useState({
+    projectId: "",
+    title: "",
+    description: "",
+    quantity: "",
+    unit: "nos",
+  });
+
+  const submit = async () => {
+    if (!form.projectId || !form.title.trim() || !form.quantity) return;
+    await create.mutateAsync({
+      data: {
+        projectId: Number(form.projectId),
+        title: form.title,
+        description: form.description || null,
+        quantity: Number(form.quantity),
+        unit: form.unit,
+      },
+    });
+    await qc.invalidateQueries({ queryKey: getListMaterialRequestsQueryKey() });
+    setOpen(false);
+    setForm({ projectId: "", title: "", description: "", quantity: "", unit: "nos" });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>{trigger}</DialogTrigger>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>New Material Request</DialogTitle>
+          <DialogDescription>
+            Identify a material need before sending RFQs to vendors.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-2">
+          <div className="sm:col-span-2">
+            <Field label="Project *">
+              <Select
+                value={form.projectId}
+                onValueChange={(v) => setForm({ ...form, projectId: v })}
+              >
+                <SelectTrigger><SelectValue placeholder="Select project" /></SelectTrigger>
+                <SelectContent>
+                  {projects?.map((p) => (
+                    <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+          <div className="sm:col-span-2">
+            <Field label="Material / item *">
+              <Input
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                placeholder="Portland Cement OPC 53 Grade"
+              />
+            </Field>
+          </div>
+          <Field label="Quantity *">
+            <Input
+              type="number"
+              min="0"
+              value={form.quantity}
+              onChange={(e) => setForm({ ...form, quantity: e.target.value })}
+              placeholder="500"
+            />
+          </Field>
+          <Field label="Unit *">
+            <Input
+              value={form.unit}
+              onChange={(e) => setForm({ ...form, unit: e.target.value })}
+              placeholder="bags / kg / m / nos"
+            />
+          </Field>
+          <div className="sm:col-span-2">
+            <Field label="Description / specs">
+              <Textarea
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                rows={2}
+                placeholder="Grade, brand preference, delivery site, etc."
+              />
+            </Field>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button
+            onClick={submit}
+            disabled={!form.projectId || !form.title.trim() || !form.quantity || create.isPending}
+          >
+            {create.isPending ? "Submitting..." : "Submit request"}
           </Button>
         </DialogFooter>
       </DialogContent>

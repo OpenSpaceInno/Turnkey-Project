@@ -862,7 +862,17 @@ export const ListProjectsResponseItem = zod.object({
   endDate: zod.coerce.date().nullish(),
   budget: zod.number().nullish(),
   description: zod.string().nullish(),
-  status: zod.enum(["planning", "in_progress", "on_hold", "completed"]),
+  status: zod.enum([
+    "planning",
+    "procurement",
+    "execution",
+    "qc",
+    "handover",
+    "archived",
+    "in_progress",
+    "on_hold",
+    "completed",
+  ]),
   progress: zod.number(),
   teamSize: zod.number().nullish(),
   createdById: zod.number().nullish(),
@@ -882,6 +892,11 @@ export const CreateProjectBody = zod.object({
   status: zod
     .union([
       zod.literal("planning"),
+      zod.literal("procurement"),
+      zod.literal("execution"),
+      zod.literal("qc"),
+      zod.literal("handover"),
+      zod.literal("archived"),
       zod.literal("in_progress"),
       zod.literal("on_hold"),
       zod.literal("completed"),
@@ -907,7 +922,17 @@ export const GetProjectResponse = zod
     endDate: zod.coerce.date().nullish(),
     budget: zod.number().nullish(),
     description: zod.string().nullish(),
-    status: zod.enum(["planning", "in_progress", "on_hold", "completed"]),
+    status: zod.enum([
+      "planning",
+      "procurement",
+      "execution",
+      "qc",
+      "handover",
+      "archived",
+      "in_progress",
+      "on_hold",
+      "completed",
+    ]),
     progress: zod.number(),
     teamSize: zod.number().nullish(),
     createdById: zod.number().nullish(),
@@ -982,6 +1007,11 @@ export const UpdateProjectBody = zod.object({
   status: zod
     .union([
       zod.literal("planning"),
+      zod.literal("procurement"),
+      zod.literal("execution"),
+      zod.literal("qc"),
+      zod.literal("handover"),
+      zod.literal("archived"),
       zod.literal("in_progress"),
       zod.literal("on_hold"),
       zod.literal("completed"),
@@ -1002,7 +1032,17 @@ export const UpdateProjectResponse = zod.object({
   endDate: zod.coerce.date().nullish(),
   budget: zod.number().nullish(),
   description: zod.string().nullish(),
-  status: zod.enum(["planning", "in_progress", "on_hold", "completed"]),
+  status: zod.enum([
+    "planning",
+    "procurement",
+    "execution",
+    "qc",
+    "handover",
+    "archived",
+    "in_progress",
+    "on_hold",
+    "completed",
+  ]),
   progress: zod.number(),
   teamSize: zod.number().nullish(),
   createdById: zod.number().nullish(),
@@ -1711,6 +1751,132 @@ export const UpdateMaterialRequestResponse = zod.object({
   createdById: zod.number().nullish(),
   createdByName: zod.string().nullish(),
   createdAt: zod.coerce.date(),
+});
+
+export const ListPunchListItemsQueryParams = zod.object({
+  projectId: zod.coerce.number().optional(),
+});
+
+export const ListPunchListItemsResponseItem = zod.object({
+  id: zod.number(),
+  projectId: zod.number(),
+  projectName: zod.string().nullish(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  category: zod.enum([
+    "civil",
+    "mechanical",
+    "electrical",
+    "finishing",
+    "safety",
+    "general",
+  ]),
+  priority: zod.enum(["high", "medium", "low"]),
+  status: zod.enum(["open", "in_progress", "resolved", "closed"]),
+  assignedToId: zod.number().nullish(),
+  assignedToName: zod.string().nullish(),
+  dueDate: zod.coerce.date().nullish(),
+  resolvedAt: zod.coerce.date().nullish(),
+  resolvedById: zod.number().nullish(),
+  createdById: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListPunchListItemsResponse = zod.array(
+  ListPunchListItemsResponseItem,
+);
+
+export const CreatePunchListItemBody = zod.object({
+  projectId: zod.number(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  category: zod.enum([
+    "civil",
+    "mechanical",
+    "electrical",
+    "finishing",
+    "safety",
+    "general",
+  ]),
+  priority: zod
+    .union([
+      zod.literal("high"),
+      zod.literal("medium"),
+      zod.literal("low"),
+      zod.literal(null),
+    ])
+    .nullish(),
+  assignedToId: zod.number().nullish(),
+  dueDate: zod.coerce.date().nullish(),
+});
+
+export const UpdatePunchListItemParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdatePunchListItemBody = zod.object({
+  title: zod.string().nullish(),
+  description: zod.string().nullish(),
+  category: zod
+    .union([
+      zod.literal("civil"),
+      zod.literal("mechanical"),
+      zod.literal("electrical"),
+      zod.literal("finishing"),
+      zod.literal("safety"),
+      zod.literal("general"),
+      zod.literal(null),
+    ])
+    .nullish(),
+  priority: zod
+    .union([
+      zod.literal("high"),
+      zod.literal("medium"),
+      zod.literal("low"),
+      zod.literal(null),
+    ])
+    .nullish(),
+  status: zod
+    .union([
+      zod.literal("open"),
+      zod.literal("in_progress"),
+      zod.literal("resolved"),
+      zod.literal("closed"),
+      zod.literal(null),
+    ])
+    .nullish(),
+  assignedToId: zod.number().nullish(),
+  dueDate: zod.string().nullish(),
+});
+
+export const UpdatePunchListItemResponse = zod.object({
+  id: zod.number(),
+  projectId: zod.number(),
+  projectName: zod.string().nullish(),
+  title: zod.string(),
+  description: zod.string().nullish(),
+  category: zod.enum([
+    "civil",
+    "mechanical",
+    "electrical",
+    "finishing",
+    "safety",
+    "general",
+  ]),
+  priority: zod.enum(["high", "medium", "low"]),
+  status: zod.enum(["open", "in_progress", "resolved", "closed"]),
+  assignedToId: zod.number().nullish(),
+  assignedToName: zod.string().nullish(),
+  dueDate: zod.coerce.date().nullish(),
+  resolvedAt: zod.coerce.date().nullish(),
+  resolvedById: zod.number().nullish(),
+  createdById: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+export const DeletePunchListItemParams = zod.object({
+  id: zod.coerce.number(),
 });
 
 export const ListRfqsResponseItem = zod.object({

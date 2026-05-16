@@ -3,6 +3,7 @@ import {
   useListPurchaseOrders,
   useListRfqs,
   useListMaterials,
+  useListMaterialRequests,
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,31 +16,93 @@ import {
   NewPurchaseOrderDialog,
   NewRfqDialog,
   NewMaterialDialog,
+  NewMaterialRequestDialog,
 } from "@/components/dialogs/procurement-dialogs";
+
+const MR_STATUS: Record<string, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
+  pending:   { label: "Pending",   variant: "outline" },
+  approved:  { label: "Approved",  variant: "default" },
+  fulfilled: { label: "Fulfilled", variant: "secondary" },
+  rejected:  { label: "Rejected",  variant: "destructive" },
+};
 
 export default function Procurement() {
   const { data: vendors, isLoading: loadingVendors } = useListVendors();
   const { data: pos, isLoading: loadingPos } = useListPurchaseOrders();
   const { data: rfqs, isLoading: loadingRfqs } = useListRfqs();
   const { data: materials, isLoading: loadingMaterials } = useListMaterials();
+  const { data: mrs, isLoading: loadingMrs } = useListMaterialRequests();
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Procurement</h1>
-          <p className="text-muted-foreground">Manage vendors, RFQs, purchase orders, and inventory.</p>
+          <p className="text-muted-foreground">Manage material requests, vendors, RFQs, purchase orders, and inventory.</p>
         </div>
       </div>
 
-      <Tabs defaultValue="pos">
-        <TabsList>
+      <Tabs defaultValue="mr">
+        <TabsList className="flex-wrap h-auto">
+          <TabsTrigger value="mr">Material Requests</TabsTrigger>
           <TabsTrigger value="pos">Purchase Orders</TabsTrigger>
-          <TabsTrigger value="vendors">Vendors</TabsTrigger>
           <TabsTrigger value="rfqs">RFQs</TabsTrigger>
-          <TabsTrigger value="materials">Materials</TabsTrigger>
+          <TabsTrigger value="vendors">Vendors</TabsTrigger>
+          <TabsTrigger value="materials">Inventory</TabsTrigger>
         </TabsList>
 
+        {/* ── Material Requests ── */}
+        <TabsContent value="mr" className="space-y-4 pt-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-xl font-semibold">Material Requests</h2>
+              <p className="text-sm text-muted-foreground">Identify material needs before raising RFQs.</p>
+            </div>
+            <NewMaterialRequestDialog
+              trigger={
+                <Button size="sm" className="gap-2"><Plus className="w-4 h-4" /> New Request</Button>
+              }
+            />
+          </div>
+          <div className="rounded-md border bg-card">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-muted/50 text-muted-foreground border-b">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Title</th>
+                  <th className="px-4 py-3 font-medium">Project</th>
+                  <th className="px-4 py-3 font-medium">Quantity</th>
+                  <th className="px-4 py-3 font-medium">Unit</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium text-right">Raised on</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {mrs?.map(mr => {
+                  const meta = MR_STATUS[mr.status] ?? { label: mr.status, variant: "outline" as const };
+                  return (
+                    <tr key={mr.id} className="hover:bg-accent/50 transition-colors">
+                      <td className="px-4 py-3 font-medium">{mr.title}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{mr.projectName}</td>
+                      <td className="px-4 py-3">{mr.quantity}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{mr.unit}</td>
+                      <td className="px-4 py-3">
+                        <Badge variant={meta.variant}>{meta.label}</Badge>
+                      </td>
+                      <td className="px-4 py-3 text-right text-muted-foreground">
+                        {format(new Date(mr.createdAt), "MMM d, yyyy")}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {!mrs?.length && !loadingMrs && (
+                  <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground border-dashed border-t">No material requests yet.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </TabsContent>
+
+        {/* ── Purchase Orders ── */}
         <TabsContent value="pos" className="space-y-4 pt-4">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold">Purchase Orders</h2>
@@ -82,6 +145,7 @@ export default function Procurement() {
           </div>
         </TabsContent>
 
+        {/* ── Vendors ── */}
         <TabsContent value="vendors" className="space-y-4 pt-4">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold">Vendors</h2>
@@ -122,6 +186,7 @@ export default function Procurement() {
           </div>
         </TabsContent>
 
+        {/* ── RFQs ── */}
         <TabsContent value="rfqs" className="space-y-4 pt-4">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold">Requests for Quotation</h2>
@@ -160,6 +225,7 @@ export default function Procurement() {
           </div>
         </TabsContent>
 
+        {/* ── Materials Inventory ── */}
         <TabsContent value="materials" className="space-y-4 pt-4">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold">Materials Inventory</h2>

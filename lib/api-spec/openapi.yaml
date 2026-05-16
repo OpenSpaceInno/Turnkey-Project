@@ -468,6 +468,34 @@ paths:
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/MaterialRequestUpdate" } } } }
       responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/MaterialRequest" } } } } }
 
+  /punch-list-items:
+    get:
+      operationId: listPunchListItems
+      tags: [punch-list]
+      parameters:
+        - name: projectId
+          in: query
+          required: false
+          schema: { type: integer }
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/PunchListItem" } } } } } }
+    post:
+      operationId: createPunchListItem
+      tags: [punch-list]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/PunchListItemInput" } } } }
+      responses: { "201": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/PunchListItem" } } } } }
+  /punch-list-items/{id}:
+    patch:
+      operationId: updatePunchListItem
+      tags: [punch-list]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/PunchListItemUpdate" } } } }
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/PunchListItem" } } } } }
+    delete:
+      operationId: deletePunchListItem
+      tags: [punch-list]
+      parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+      responses: { "204": { description: deleted } }
+
   /rfqs:
     get:
       operationId: listRfqs
@@ -968,7 +996,7 @@ components:
         endDate: { type: ["string", "null"], format: date }
         budget: { type: ["number", "null"] }
         description: { type: ["string", "null"] }
-        status: { type: string, enum: [planning, in_progress, on_hold, completed] }
+        status: { type: string, enum: [planning, procurement, execution, qc, handover, archived, in_progress, on_hold, completed] }
         progress: { type: integer }
         teamSize: { type: ["integer", "null"] }
         createdById: { type: ["integer", "null"] }
@@ -985,7 +1013,7 @@ components:
         endDate: { type: ["string", "null"], format: date }
         budget: { type: ["number", "null"] }
         description: { type: ["string", "null"] }
-        status: { type: ["string", "null"], enum: [planning, in_progress, on_hold, completed, null] }
+        status: { type: ["string", "null"], enum: [planning, procurement, execution, qc, handover, archived, in_progress, on_hold, completed, null] }
         progress: { type: ["integer", "null"] }
         teamSize: { type: ["integer", "null"] }
     ProjectDetail:
@@ -1507,6 +1535,50 @@ components:
         message: { type: ["string", "null"] }
         isRead: { type: boolean }
         createdAt: { type: string, format: date-time }
+
+    PunchListItem:
+      type: object
+      required: [id, projectId, title, category, priority, status, createdAt, updatedAt]
+      properties:
+        id: { type: integer }
+        projectId: { type: integer }
+        projectName: { type: ["string", "null"] }
+        title: { type: string }
+        description: { type: ["string", "null"] }
+        category: { type: string, enum: [civil, mechanical, electrical, finishing, safety, general] }
+        priority: { type: string, enum: [high, medium, low] }
+        status: { type: string, enum: [open, in_progress, resolved, closed] }
+        assignedToId: { type: ["integer", "null"] }
+        assignedToName: { type: ["string", "null"] }
+        dueDate: { type: ["string", "null"], format: date }
+        resolvedAt: { type: ["string", "null"], format: date-time }
+        resolvedById: { type: ["integer", "null"] }
+        createdById: { type: ["integer", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    PunchListItemInput:
+      type: object
+      required: [projectId, title, category]
+      properties:
+        projectId: { type: integer }
+        title: { type: string }
+        description: { type: ["string", "null"] }
+        category: { type: string, enum: [civil, mechanical, electrical, finishing, safety, general] }
+        priority: { type: ["string", "null"], enum: [high, medium, low, null] }
+        assignedToId: { type: ["integer", "null"] }
+        dueDate: { type: ["string", "null"], format: date }
+
+    PunchListItemUpdate:
+      type: object
+      properties:
+        title: { type: ["string", "null"] }
+        description: { type: ["string", "null"] }
+        category: { type: ["string", "null"], enum: [civil, mechanical, electrical, finishing, safety, general, null] }
+        priority: { type: ["string", "null"], enum: [high, medium, low, null] }
+        status: { type: ["string", "null"], enum: [open, in_progress, resolved, closed, null] }
+        assignedToId: { type: ["integer", "null"] }
+        dueDate: { type: ["string", "null"] }
 
     AuditLog:
       type: object

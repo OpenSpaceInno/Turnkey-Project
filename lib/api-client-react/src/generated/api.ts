@@ -56,6 +56,7 @@ import type {
   ListExpensesParams,
   ListInvoicesParams,
   ListMeetingsParams,
+  ListPunchListItemsParams,
   ListRaBillsParams,
   ListStakeholdersParams,
   ListTasksParams,
@@ -74,6 +75,9 @@ import type {
   Project,
   ProjectDetail,
   ProjectInput,
+  PunchListItem,
+  PunchListItemInput,
+  PunchListItemUpdate,
   PurchaseOrder,
   PurchaseOrderInput,
   PurchaseOrderUpdate,
@@ -5109,6 +5113,335 @@ export const useUpdateMaterialRequest = <
   TContext
 > => {
   return useMutation(getUpdateMaterialRequestMutationOptions(options));
+};
+
+export const getListPunchListItemsUrl = (params?: ListPunchListItemsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/punch-list-items?${stringifiedParams}`
+    : `/api/punch-list-items`;
+};
+
+export const listPunchListItems = async (
+  params?: ListPunchListItemsParams,
+  options?: RequestInit,
+): Promise<PunchListItem[]> => {
+  return customFetch<PunchListItem[]>(getListPunchListItemsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListPunchListItemsQueryKey = (
+  params?: ListPunchListItemsParams,
+) => {
+  return [`/api/punch-list-items`, ...(params ? [params] : [])] as const;
+};
+
+export const getListPunchListItemsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listPunchListItems>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListPunchListItemsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listPunchListItems>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListPunchListItemsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listPunchListItems>>
+  > = ({ signal }) => listPunchListItems(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listPunchListItems>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListPunchListItemsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listPunchListItems>>
+>;
+export type ListPunchListItemsQueryError = ErrorType<unknown>;
+
+export function useListPunchListItems<
+  TData = Awaited<ReturnType<typeof listPunchListItems>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListPunchListItemsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listPunchListItems>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListPunchListItemsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getCreatePunchListItemUrl = () => {
+  return `/api/punch-list-items`;
+};
+
+export const createPunchListItem = async (
+  punchListItemInput: PunchListItemInput,
+  options?: RequestInit,
+): Promise<PunchListItem> => {
+  return customFetch<PunchListItem>(getCreatePunchListItemUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(punchListItemInput),
+  });
+};
+
+export const getCreatePunchListItemMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createPunchListItem>>,
+    TError,
+    { data: BodyType<PunchListItemInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createPunchListItem>>,
+  TError,
+  { data: BodyType<PunchListItemInput> },
+  TContext
+> => {
+  const mutationKey = ["createPunchListItem"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createPunchListItem>>,
+    { data: BodyType<PunchListItemInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createPunchListItem(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreatePunchListItemMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createPunchListItem>>
+>;
+export type CreatePunchListItemMutationBody = BodyType<PunchListItemInput>;
+export type CreatePunchListItemMutationError = ErrorType<unknown>;
+
+export const useCreatePunchListItem = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createPunchListItem>>,
+    TError,
+    { data: BodyType<PunchListItemInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createPunchListItem>>,
+  TError,
+  { data: BodyType<PunchListItemInput> },
+  TContext
+> => {
+  return useMutation(getCreatePunchListItemMutationOptions(options));
+};
+
+export const getUpdatePunchListItemUrl = (id: number) => {
+  return `/api/punch-list-items/${id}`;
+};
+
+export const updatePunchListItem = async (
+  id: number,
+  punchListItemUpdate: PunchListItemUpdate,
+  options?: RequestInit,
+): Promise<PunchListItem> => {
+  return customFetch<PunchListItem>(getUpdatePunchListItemUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(punchListItemUpdate),
+  });
+};
+
+export const getUpdatePunchListItemMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updatePunchListItem>>,
+    TError,
+    { id: number; data: BodyType<PunchListItemUpdate> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updatePunchListItem>>,
+  TError,
+  { id: number; data: BodyType<PunchListItemUpdate> },
+  TContext
+> => {
+  const mutationKey = ["updatePunchListItem"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updatePunchListItem>>,
+    { id: number; data: BodyType<PunchListItemUpdate> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updatePunchListItem(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdatePunchListItemMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updatePunchListItem>>
+>;
+export type UpdatePunchListItemMutationBody = BodyType<PunchListItemUpdate>;
+export type UpdatePunchListItemMutationError = ErrorType<unknown>;
+
+export const useUpdatePunchListItem = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updatePunchListItem>>,
+    TError,
+    { id: number; data: BodyType<PunchListItemUpdate> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updatePunchListItem>>,
+  TError,
+  { id: number; data: BodyType<PunchListItemUpdate> },
+  TContext
+> => {
+  return useMutation(getUpdatePunchListItemMutationOptions(options));
+};
+
+export const getDeletePunchListItemUrl = (id: number) => {
+  return `/api/punch-list-items/${id}`;
+};
+
+export const deletePunchListItem = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeletePunchListItemUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeletePunchListItemMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deletePunchListItem>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deletePunchListItem>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deletePunchListItem"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deletePunchListItem>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deletePunchListItem(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeletePunchListItemMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deletePunchListItem>>
+>;
+
+export type DeletePunchListItemMutationError = ErrorType<unknown>;
+
+export const useDeletePunchListItem = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deletePunchListItem>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deletePunchListItem>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeletePunchListItemMutationOptions(options));
 };
 
 export const getListRfqsUrl = () => {

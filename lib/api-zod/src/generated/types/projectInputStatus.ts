@@ -15,6 +15,11 @@ export type ProjectInputStatus =
 
 export const ProjectInputStatus = {
   planning: "planning",
+  procurement: "procurement",
+  execution: "execution",
+  qc: "qc",
+  handover: "handover",
+  archived: "archived",
   in_progress: "in_progress",
   on_hold: "on_hold",
   completed: "completed",

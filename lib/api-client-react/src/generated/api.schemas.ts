@@ -595,6 +595,11 @@ export type ProjectStatus = (typeof ProjectStatus)[keyof typeof ProjectStatus];
 
 export const ProjectStatus = {
   planning: "planning",
+  procurement: "procurement",
+  execution: "execution",
+  qc: "qc",
+  handover: "handover",
+  archived: "archived",
   in_progress: "in_progress",
   on_hold: "on_hold",
   completed: "completed",
@@ -635,6 +640,11 @@ export type ProjectInputStatus =
 
 export const ProjectInputStatus = {
   planning: "planning",
+  procurement: "procurement",
+  execution: "execution",
+  qc: "qc",
+  handover: "handover",
+  archived: "archived",
   in_progress: "in_progress",
   on_hold: "on_hold",
   completed: "completed",
@@ -1802,6 +1812,163 @@ export interface Notification {
   createdAt: string;
 }
 
+export type PunchListItemCategory =
+  (typeof PunchListItemCategory)[keyof typeof PunchListItemCategory];
+
+export const PunchListItemCategory = {
+  civil: "civil",
+  mechanical: "mechanical",
+  electrical: "electrical",
+  finishing: "finishing",
+  safety: "safety",
+  general: "general",
+} as const;
+
+export type PunchListItemPriority =
+  (typeof PunchListItemPriority)[keyof typeof PunchListItemPriority];
+
+export const PunchListItemPriority = {
+  high: "high",
+  medium: "medium",
+  low: "low",
+} as const;
+
+export type PunchListItemStatus =
+  (typeof PunchListItemStatus)[keyof typeof PunchListItemStatus];
+
+export const PunchListItemStatus = {
+  open: "open",
+  in_progress: "in_progress",
+  resolved: "resolved",
+  closed: "closed",
+} as const;
+
+export interface PunchListItem {
+  id: number;
+  projectId: number;
+  /** @nullable */
+  projectName?: string | null;
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  category: PunchListItemCategory;
+  priority: PunchListItemPriority;
+  status: PunchListItemStatus;
+  /** @nullable */
+  assignedToId?: number | null;
+  /** @nullable */
+  assignedToName?: string | null;
+  /** @nullable */
+  dueDate?: string | null;
+  /** @nullable */
+  resolvedAt?: string | null;
+  /** @nullable */
+  resolvedById?: number | null;
+  /** @nullable */
+  createdById?: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type PunchListItemInputCategory =
+  (typeof PunchListItemInputCategory)[keyof typeof PunchListItemInputCategory];
+
+export const PunchListItemInputCategory = {
+  civil: "civil",
+  mechanical: "mechanical",
+  electrical: "electrical",
+  finishing: "finishing",
+  safety: "safety",
+  general: "general",
+} as const;
+
+/**
+ * @nullable
+ */
+export type PunchListItemInputPriority =
+  | (typeof PunchListItemInputPriority)[keyof typeof PunchListItemInputPriority]
+  | null;
+
+export const PunchListItemInputPriority = {
+  high: "high",
+  medium: "medium",
+  low: "low",
+} as const;
+
+export interface PunchListItemInput {
+  projectId: number;
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  category: PunchListItemInputCategory;
+  /** @nullable */
+  priority?: PunchListItemInputPriority;
+  /** @nullable */
+  assignedToId?: number | null;
+  /** @nullable */
+  dueDate?: string | null;
+}
+
+/**
+ * @nullable
+ */
+export type PunchListItemUpdateCategory =
+  | (typeof PunchListItemUpdateCategory)[keyof typeof PunchListItemUpdateCategory]
+  | null;
+
+export const PunchListItemUpdateCategory = {
+  civil: "civil",
+  mechanical: "mechanical",
+  electrical: "electrical",
+  finishing: "finishing",
+  safety: "safety",
+  general: "general",
+} as const;
+
+/**
+ * @nullable
+ */
+export type PunchListItemUpdatePriority =
+  | (typeof PunchListItemUpdatePriority)[keyof typeof PunchListItemUpdatePriority]
+  | null;
+
+export const PunchListItemUpdatePriority = {
+  high: "high",
+  medium: "medium",
+  low: "low",
+} as const;
+
+/**
+ * @nullable
+ */
+export type PunchListItemUpdateStatus =
+  | (typeof PunchListItemUpdateStatus)[keyof typeof PunchListItemUpdateStatus]
+  | null;
+
+export const PunchListItemUpdateStatus = {
+  open: "open",
+  in_progress: "in_progress",
+  resolved: "resolved",
+  closed: "closed",
+} as const;
+
+export interface PunchListItemUpdate {
+  /** @nullable */
+  title?: string | null;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  category?: PunchListItemUpdateCategory;
+  /** @nullable */
+  priority?: PunchListItemUpdatePriority;
+  /** @nullable */
+  status?: PunchListItemUpdateStatus;
+  /** @nullable */
+  assignedToId?: number | null;
+  /** @nullable */
+  dueDate?: string | null;
+}
+
 export interface AuditLog {
   id: number;
   /** @nullable */
@@ -1837,6 +2004,10 @@ export type ListInvoicesParams = {
 };
 
 export type ListVendorInvoicesParams = {
+  projectId?: number;
+};
+
+export type ListPunchListItemsParams = {
   projectId?: number;
 };
 
