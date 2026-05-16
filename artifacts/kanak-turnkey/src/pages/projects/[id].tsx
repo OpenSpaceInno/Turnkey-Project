@@ -88,6 +88,7 @@ export default function ProjectDetail() {
   const createPunch    = useCreatePunchListItem();
   const updatePunch    = useUpdatePunchListItem();
 
+  const [activeTab, setActiveTab] = useState("overview");
   const [advanceOpen, setAdvanceOpen] = useState(false);
   const [punchOpen, setPunchOpen] = useState(false);
   const [punchForm, setPunchForm] = useState({ title: "", description: "", category: "general", priority: "medium", dueDate: "" });
@@ -285,7 +286,7 @@ export default function ProjectDetail() {
 
         {/* Main tabs */}
         <div className="md:col-span-3">
-          <Tabs defaultValue="overview">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent flex-wrap">
               {[
                 { value: "overview",      label: "Overview" },
@@ -306,6 +307,102 @@ export default function ProjectDetail() {
             <div className="py-6">
               {/* ── Overview ── */}
               <TabsContent value="overview" className="m-0 space-y-6">
+
+                {/* ── Workflow Next-Steps Guide ── */}
+                {(() => {
+                  type Action = { icon: React.ReactNode; label: string; desc: string; tab?: string; done?: boolean };
+                  const guide: Record<string, { title: string; actions: Action[] }> = {
+                    planning: {
+                      title: "Start by setting up the project foundation",
+                      actions: [
+                        { icon: <LayoutTemplate className="h-4 w-4" />, label: "Apply a task template", desc: "Generate the full task plan in one click", tab: "tasks", done: projectTasks.length > 0 },
+                        { icon: <CheckCircle2 className="h-4 w-4" />, label: "Add budget items", desc: "Set up cost codes and allocated amounts", tab: "budget", done: projectBudget.length > 0 },
+                        { icon: <Circle className="h-4 w-4" />, label: "Add stakeholders", desc: "Client, consultants, contractors", tab: "stakeholders", done: projectStakeholders.length > 0 },
+                        { icon: <FileText className="h-4 w-4" />, label: "Upload key documents", desc: "Drawings, approvals, contracts", tab: "documents", done: projectDocs.length > 0 },
+                      ],
+                    },
+                    procurement: {
+                      title: "Procurement phase — source materials and vendors",
+                      actions: [
+                        { icon: <Circle className="h-4 w-4" />, label: "Raise material requests", desc: "List all materials needed", done: false },
+                        { icon: <Circle className="h-4 w-4" />, label: "Send RFQs to vendors", desc: "Compare quotations before ordering" },
+                        { icon: <Circle className="h-4 w-4" />, label: "Create purchase orders", desc: "Issue approved POs to vendors" },
+                        { icon: <CheckCircle2 className="h-4 w-4" />, label: "Update task progress", desc: "Mark procurement tasks as done", tab: "tasks", done: projectTasks.filter(t => t.status === "completed").length > 0 },
+                      ],
+                    },
+                    execution: {
+                      title: "Execution phase — track site progress",
+                      actions: [
+                        { icon: <Clock className="h-4 w-4" />, label: "Update task status", desc: "Move tasks to In Progress / Completed", tab: "tasks", done: projectTasks.filter(t => t.status === "in_progress" || t.status === "completed").length > 0 },
+                        { icon: <Circle className="h-4 w-4" />, label: "Log expenses", desc: "Record site costs against budget", tab: "budget", done: false },
+                        { icon: <Circle className="h-4 w-4" />, label: "Create RA bills", desc: "Raise running account bills at milestones", tab: "rabills", done: projectRaBills.length > 0 },
+                        { icon: <FileText className="h-4 w-4" />, label: "Upload progress photos", desc: "Document work done on site", tab: "documents" },
+                      ],
+                    },
+                    qc: {
+                      title: "QC phase — inspect, punch, and clear",
+                      actions: [
+                        { icon: <ClipboardList className="h-4 w-4" />, label: "Add punch list items", desc: "Record every defect during inspection", tab: "punchlist", done: projectPunch.length > 0 },
+                        { icon: <CheckCircle2 className="h-4 w-4" />, label: "Resolve open items", desc: `${openPunch} item${openPunch !== 1 ? "s" : ""} still open`, tab: "punchlist", done: openPunch === 0 && projectPunch.length > 0 },
+                        { icon: <FileText className="h-4 w-4" />, label: "Upload test reports", desc: "MEP commissioning, structural audits", tab: "documents" },
+                        { icon: <Circle className="h-4 w-4" />, label: "Complete all tasks", desc: `${projectTasks.filter(t => t.status !== "completed").length} tasks remaining`, tab: "tasks" },
+                      ],
+                    },
+                    handover: {
+                      title: "Handover — finalise, sign off, and close",
+                      actions: [
+                        { icon: <FileText className="h-4 w-4" />, label: "Upload as-built drawings", desc: "Final design documentation", tab: "documents" },
+                        { icon: <Circle className="h-4 w-4" />, label: "Clear all punch list items", desc: `${openPunch} item${openPunch !== 1 ? "s" : ""} still open`, tab: "punchlist", done: openPunch === 0 },
+                        { icon: <Circle className="h-4 w-4" />, label: "Issue final invoice", desc: "Raise balance payment invoice" },
+                        { icon: <Circle className="h-4 w-4" />, label: "Get client sign-off", desc: "Upload acceptance certificate", tab: "documents" },
+                      ],
+                    },
+                    archived: {
+                      title: "Project archived — all done",
+                      actions: [
+                        { icon: <CheckCircle2 className="h-4 w-4" />, label: "Project complete", desc: "All work finished and handed over", done: true },
+                      ],
+                    },
+                  };
+
+                  const stageKey = project.status in guide ? project.status : "planning";
+                  const g = guide[stageKey]!;
+                  const doneCount = g.actions.filter(a => a.done).length;
+
+                  return (
+                    <Card className="border-primary/20 bg-primary/5">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <CardTitle className="text-base text-primary">{g.title}</CardTitle>
+                          <span className="text-xs font-medium text-muted-foreground">{doneCount}/{g.actions.length} done</span>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {g.actions.map((action, i) => (
+                            <button
+                              key={i}
+                              className={`flex items-start gap-3 p-3 rounded-lg border text-left transition-all
+                                ${action.done
+                                  ? "border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20 dark:border-emerald-900 opacity-70"
+                                  : "border-border bg-background hover:border-primary/40 hover:bg-accent/50 cursor-pointer"}`}
+                              onClick={() => { if (action.tab) setActiveTab(action.tab); }}
+                            >
+                              <span className={`mt-0.5 shrink-0 ${action.done ? "text-emerald-600" : "text-primary"}`}>
+                                {action.done ? <CheckCircle2 className="h-4 w-4" /> : action.icon}
+                              </span>
+                              <div className="min-w-0">
+                                <div className={`text-sm font-medium ${action.done ? "line-through text-muted-foreground" : ""}`}>{action.label}</div>
+                                <div className="text-xs text-muted-foreground mt-0.5">{action.desc}</div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })()}
+
                 <Card>
                   <CardHeader><CardTitle className="text-base">Project Description</CardTitle></CardHeader>
                   <CardContent>

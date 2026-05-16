@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useCreateLead,
@@ -283,7 +284,7 @@ export function NewLeadDialog({ trigger }: { trigger: ReactNode }) {
   );
 }
 
-export function NewProjectDialog({ trigger }: { trigger: ReactNode }) {
+export function NewProjectDialog({ trigger, onCreated }: { trigger: ReactNode; onCreated?: (id: number) => void }) {
   const [open, setOpen] = useState(false);
   const qc = useQueryClient();
   const create = useCreateProject();
@@ -303,7 +304,7 @@ export function NewProjectDialog({ trigger }: { trigger: ReactNode }) {
 
   const submit = async () => {
     if (!form.name.trim()) return;
-    await create.mutateAsync({
+    const created = await create.mutateAsync({
       data: {
         name: form.name,
         type: form.type || undefined,
@@ -338,6 +339,7 @@ export function NewProjectDialog({ trigger }: { trigger: ReactNode }) {
       description: "",
       status: "planning",
     });
+    if (onCreated && created?.id) onCreated(created.id);
   };
 
   return (
