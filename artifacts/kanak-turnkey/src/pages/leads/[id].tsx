@@ -34,6 +34,8 @@ import {
   Calendar,
   Trophy,
   ArrowRight,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 
 export default function LeadDetail() {
@@ -144,51 +146,95 @@ export default function LeadDetail() {
               tasks from kickoff to handover.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="convert-name">Project name</Label>
-              <Input
-                id="convert-name"
-                value={projectName}
-                onChange={(e) => setProjectName(e.target.value)}
-                placeholder="e.g. Citygate Residences"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="convert-start">Project start date</Label>
-              <Input
-                id="convert-start"
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setConvertOpen(false)}
-              disabled={convertMutation.isPending}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() =>
-                convertMutation.mutate({
-                  id: leadId,
-                  data: {
-                    projectName: projectName || null,
-                    startDate: startDate || null,
-                  },
-                })
-              }
-              disabled={convertMutation.isPending || !projectName.trim()}
-            >
-              {convertMutation.isPending
-                ? "Converting…"
-                : "Convert to project"}
-            </Button>
-          </DialogFooter>
+
+          {/* Prerequisites checklist */}
+          {(() => {
+            const hasApprovedBoq = lead.boqs?.some((b) => b.status === "approved") ?? false;
+            const hasApprovedDrawing = lead.drawings?.some((d) => d.status === "approved") ?? false;
+            const prereqsMet = hasApprovedBoq && hasApprovedDrawing;
+
+            return (
+              <>
+                <div className="rounded-lg border bg-muted/40 p-4 space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+                    Conversion prerequisites
+                  </p>
+                  <div className="flex items-center gap-2 text-sm">
+                    {hasApprovedBoq ? (
+                      <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                    ) : (
+                      <XCircle className="h-4 w-4 text-destructive shrink-0" />
+                    )}
+                    <span className={hasApprovedBoq ? "text-foreground" : "text-destructive"}>
+                      BOQ — at least one version must be <b>Approved</b>
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    {hasApprovedDrawing ? (
+                      <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                    ) : (
+                      <XCircle className="h-4 w-4 text-destructive shrink-0" />
+                    )}
+                    <span className={hasApprovedDrawing ? "text-foreground" : "text-destructive"}>
+                      Drawings — at least one drawing must be <b>Approved</b>
+                    </span>
+                  </div>
+                  {!prereqsMet && (
+                    <p className="text-xs text-muted-foreground pt-1">
+                      Go to the Drawings and BOQs tabs to approve the required documents before converting.
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-4 py-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="convert-name">Project name</Label>
+                    <Input
+                      id="convert-name"
+                      value={projectName}
+                      onChange={(e) => setProjectName(e.target.value)}
+                      placeholder="e.g. Citygate Residences"
+                      disabled={!prereqsMet}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="convert-start">Project start date</Label>
+                    <Input
+                      id="convert-start"
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      disabled={!prereqsMet}
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => setConvertOpen(false)}
+                    disabled={convertMutation.isPending}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() =>
+                      convertMutation.mutate({
+                        id: leadId,
+                        data: {
+                          projectName: projectName || null,
+                          startDate: startDate || null,
+                        },
+                      })
+                    }
+                    disabled={convertMutation.isPending || !projectName.trim() || !prereqsMet}
+                    title={!prereqsMet ? "Approve BOQ and Drawings before converting" : undefined}
+                  >
+                    {convertMutation.isPending ? "Converting…" : "Convert to project"}
+                  </Button>
+                </DialogFooter>
+              </>
+            );
+          })()}
         </DialogContent>
       </Dialog>
 

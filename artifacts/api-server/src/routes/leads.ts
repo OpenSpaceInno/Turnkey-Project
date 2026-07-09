@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, sql, asc, desc } from "drizzle-orm";
+import { eq, sql, asc, desc, and } from "drizzle-orm";
 import {
   db,
   leadsTable,
@@ -659,6 +659,35 @@ router.post("/leads/:id/convert", async (req, res): Promise<void> => {
     });
     return;
   }
+
+  // ── Prerequisite check ──────────────────────────────────────────────────
+  // Both an approved BOQ and an approved Drawing must exist before a lead
+  // can be converted to a project.
+  const [approvedBoq] = await db
+    .select({ id: boqsTable.id })
+    .from(boqsTable)
+    .where(and(eq(boqsTable.leadId, id), eq(boqsTable.status, "approved")))
+    .limit(1);
+
+  const [approvedDrawing] = await db
+    .select({ id: drawingsTable.id })
+    .from(drawingsTable)
+    .where(
+      and(eq(drawingsTable.leadId, id), eq(drawingsTable.status, "approved")),
+    )
+    .limit(1);
+
+  if (!approvedBoq || !approvedDrawing) {
+    const missing: string[] = [];
+    if (!approvedBoq) missing.push("BOQ");
+    if (!approvedDrawing) missing.push("Drawings");
+    res.status(422).json({
+      error: `Cannot convert lead: the following must be approved first: ${missing.join(", ")}.`,
+      missing,
+    });
+    return;
+  }
+  // ────────────────────────────────────────────────────────────────────────
 
   // Pick a sensible project name & start date.
   const projectName: string =
