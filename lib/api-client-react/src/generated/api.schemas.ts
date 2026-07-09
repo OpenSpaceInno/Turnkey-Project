@@ -1709,6 +1709,21 @@ export interface StakeholderInput {
   accessLevel?: StakeholderInputAccessLevel;
 }
 
+export interface StakeholderUpdate {
+  /** @nullable */
+  name?: string;
+  /** @nullable */
+  email?: string | null;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  organization?: string | null;
+  /** @nullable */
+  role?: string | null;
+  /** @nullable */
+  accessLevel?: StakeholderInputAccessLevel;
+}
+
 export type CommunicationCommunicationType =
   (typeof CommunicationCommunicationType)[keyof typeof CommunicationCommunicationType];
 

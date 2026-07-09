@@ -408,4 +408,47 @@ router.post("/stakeholders", async (req, res): Promise<void> => {
   res.status(201).json(s);
 });
 
+router.patch("/stakeholders/:id", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id as string, 10);
+  if (Number.isNaN(id) || id <= 0) {
+    res.status(400).json({ error: "Invalid stakeholder id" });
+    return;
+  }
+  const b = req.body ?? {};
+  const ALLOWED_ACCESS = ["read", "write", "admin"] as const;
+  const update: Record<string, unknown> = {};
+  if (b.name !== undefined) {
+    if (typeof b.name !== "string" || !b.name.trim()) {
+      res.status(400).json({ error: "name must be a non-empty string" });
+      return;
+    }
+    update.name = b.name.trim();
+  }
+  if (b.email !== undefined) update.email = b.email || null;
+  if (b.phone !== undefined) update.phone = b.phone || null;
+  if (b.organization !== undefined) update.organization = b.organization || null;
+  if (b.role !== undefined) update.role = b.role || null;
+  if (b.accessLevel !== undefined) {
+    if (!ALLOWED_ACCESS.includes(b.accessLevel)) {
+      res.status(400).json({ error: `accessLevel must be one of: ${ALLOWED_ACCESS.join(", ")}` });
+      return;
+    }
+    update.accessLevel = b.accessLevel;
+  }
+  if (Object.keys(update).length === 0) {
+    res.status(400).json({ error: "No fields to update" });
+    return;
+  }
+  const [s] = await db
+    .update(stakeholdersTable)
+    .set(update)
+    .where(eq(stakeholdersTable.id, id))
+    .returning();
+  if (!s) {
+    res.status(404).json({ error: "Stakeholder not found" });
+    return;
+  }
+  res.json(s);
+});
+
 export default router;

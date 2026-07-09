@@ -15,6 +15,10 @@ import {
   useListTaskTemplates,
   useGetTaskTemplate, getGetTaskTemplateQueryKey,
   useApplyTaskTemplate,
+  useUpdateRaBill,
+  useUpdateStakeholder,
+  type RaBill,
+  type Stakeholder,
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +37,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   ChevronLeft, Plus, FileText, CheckCircle2, Circle, Clock,
   AlertCircle, CheckCheck, ArrowRight, ClipboardList, LayoutTemplate,
+  Eye, Pencil, Printer,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -96,6 +101,15 @@ export default function ProjectDetail() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [applyStartDate, setApplyStartDate] = useState(format(new Date(), "yyyy-MM-dd"));
 
+  // RA Bill detail / print
+  const [selectedBill, setSelectedBill] = useState<RaBill | null>(null);
+  const updateRaBill = useUpdateRaBill();
+
+  // Stakeholder edit
+  const [editingStakeholder, setEditingStakeholder] = useState<Stakeholder | null>(null);
+  const [shForm, setShForm] = useState({ name: "", email: "", phone: "", organization: "", role: "", accessLevel: "read" });
+  const updateStakeholder = useUpdateStakeholder();
+
   const { data: templates } = useListTaskTemplates();
   const { data: previewTemplate } = useGetTaskTemplate(
     selectedTemplateId ? parseInt(selectedTemplateId) : 0,
@@ -157,6 +171,91 @@ export default function ProjectDetail() {
     await qc.invalidateQueries({ queryKey: getListTasksQueryKey({ projectId }) });
     setApplyOpen(false);
     setSelectedTemplateId("");
+  };
+
+  // ── RA Bill print ─────────────────────────────────────────────────────────
+  const handlePrintBill = (bill: RaBill) => {
+    const w = window.open("", "_blank", "width=800,height=700");
+    if (!w) return;
+
+    // Escape text so no dynamic value can inject HTML/JS into the print popup.
+    const esc = (s: string) =>
+      s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+    const statusColor: Record<string, string> = {
+      draft: "#6b7280", submitted: "#2563eb", approved: "#16a34a",
+      rejected: "#dc2626", invoiced: "#9333ea",
+    };
+    const color = statusColor[bill.status] ?? "#6b7280";
+    const amtFmt = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
+    const dateStr = new Date(bill.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+
+    // Build table rows using text nodes (safe from XSS) then serialise.
+    const doc = w.document;
+    doc.write(`<!DOCTYPE html><html><head>
+      <meta charset="utf-8"/>
+      <title>RA Bill</title>
+      <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:'Segoe UI',Arial,sans-serif;color:#111;padding:40px;max-width:720px;margin:auto}
+        h1{font-size:22px;margin-bottom:4px}
+        .sub{color:#555;font-size:13px;margin-bottom:28px}
+        .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600;color:#fff;background:${color};margin-left:10px;vertical-align:middle;text-transform:capitalize}
+        table{width:100%;border-collapse:collapse;margin-top:16px}
+        th{text-align:left;padding:8px 12px;background:#f3f4f6;border:1px solid #e5e7eb;font-size:12px;color:#555;text-transform:uppercase;letter-spacing:.05em}
+        td{padding:10px 12px;border:1px solid #e5e7eb;font-size:14px}
+        .amount{font-size:28px;font-weight:700;color:#1a1a1a;margin:24px 0 8px}
+        .footer{margin-top:40px;padding-top:16px;border-top:1px solid #e5e7eb;font-size:11px;color:#aaa;display:flex;justify-content:space-between}
+        @media print{body{padding:24px}.no-print{display:none!important}}
+      </style>
+    </head><body>
+      <div class="no-print" style="margin-bottom:20px">
+        <button onclick="window.print()" style="padding:8px 20px;background:#111;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px">&#128424; Print / Save PDF</button>
+        <button onclick="window.close()" style="margin-left:10px;padding:8px 16px;border:1px solid #ccc;border-radius:6px;cursor:pointer;font-size:14px">Close</button>
+      </div>
+      <h1>Running Account Bill <span class="badge">${esc(bill.status)}</span></h1>
+      <div class="sub">${esc(bill.projectName ?? "Project")} &nbsp;&middot;&nbsp; ${esc(bill.billNumber)}</div>
+      <div class="amount">${esc(amtFmt.format(bill.amount))}</div>
+      <table>
+        <tr><th>Bill No.</th><td>${esc(bill.billNumber)}</td><th>Date</th><td>${esc(dateStr)}</td></tr>
+        ${bill.milestone ? `<tr><th>Milestone</th><td colspan="3">${esc(bill.milestone)}</td></tr>` : ""}
+        ${bill.description ? `<tr><th>Description</th><td colspan="3">${esc(bill.description)}</td></tr>` : ""}
+        <tr><th>Status</th><td style="text-transform:capitalize;font-weight:600;color:${color}">${esc(bill.status)}</td><th>Amount</th><td style="font-weight:700">${esc(amtFmt.format(bill.amount))}</td></tr>
+      </table>
+      <div class="footer"><span>Kanak Turnkey Projects</span><span>Generated ${esc(new Date().toLocaleString("en-IN"))}</span></div>
+    </body></html>`);
+    doc.close();
+    w.focus();
+  };
+
+  // ── Stakeholder edit ──────────────────────────────────────────────────────
+  const openEditStakeholder = (sh: Stakeholder) => {
+    setEditingStakeholder(sh);
+    setShForm({
+      name: sh.name,
+      email: sh.email ?? "",
+      phone: sh.phone ?? "",
+      organization: sh.organization ?? "",
+      role: sh.role ?? "",
+      accessLevel: sh.accessLevel,
+    });
+  };
+
+  const handleSaveStakeholder = async () => {
+    if (!editingStakeholder || !shForm.name.trim()) return;
+    await updateStakeholder.mutateAsync({
+      id: editingStakeholder.id,
+      data: {
+        name: shForm.name,
+        email: shForm.email || null,
+        phone: shForm.phone || null,
+        organization: shForm.organization || null,
+        role: shForm.role || null,
+        accessLevel: shForm.accessLevel as "read" | "write" | "admin",
+      },
+    });
+    await qc.invalidateQueries({ queryKey: getListStakeholdersQueryKey({ projectId }) });
+    setEditingStakeholder(null);
   };
 
   return (
@@ -805,17 +904,39 @@ export default function ProjectDetail() {
                 <div className="grid gap-4">
                   {projectRaBills.map(bill => (
                     <Card key={bill.id}>
-                      <CardContent className="p-4 flex items-center justify-between">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
+                      <CardContent className="p-4 flex items-center justify-between gap-4">
+                        <div className="space-y-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-bold text-lg">{bill.billNumber}</span>
-                            <Badge variant={bill.status === "approved" || bill.status === "invoiced" ? "default" : "secondary"}>{bill.status}</Badge>
+                            <Badge variant={bill.status === "approved" || bill.status === "invoiced" ? "default" : "secondary"} className="capitalize">{bill.status}</Badge>
                           </div>
-                          <p className="text-sm text-muted-foreground">{bill.description || bill.milestone}</p>
+                          <p className="text-sm text-muted-foreground truncate">{bill.description || bill.milestone || "—"}</p>
                         </div>
-                        <div className="text-right">
-                          <div className="font-bold text-xl text-primary">{INR.format(bill.amount)}</div>
-                          <div className="text-xs text-muted-foreground">{format(new Date(bill.createdAt), "MMM d, yyyy")}</div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <div className="text-right">
+                            <div className="font-bold text-xl text-primary">{INR.format(bill.amount)}</div>
+                            <div className="text-xs text-muted-foreground">{format(new Date(bill.createdAt), "MMM d, yyyy")}</div>
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8"
+                              title="View / Print"
+                              onClick={() => setSelectedBill(bill)}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8"
+                              title="Print"
+                              onClick={() => handlePrintBill(bill)}
+                            >
+                              <Printer className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
@@ -825,6 +946,58 @@ export default function ProjectDetail() {
                   )}
                 </div>
               </TabsContent>
+
+              {/* ── RA Bill Detail Dialog ── */}
+              <Dialog open={!!selectedBill} onOpenChange={(o) => !o && setSelectedBill(null)}>
+                <DialogContent className="max-w-lg">
+                  {selectedBill && (
+                    <>
+                      <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                          <FileText className="h-5 w-5" />
+                          {selectedBill.billNumber}
+                          <Badge variant={selectedBill.status === "approved" || selectedBill.status === "invoiced" ? "default" : "secondary"} className="capitalize ml-1">{selectedBill.status}</Badge>
+                        </DialogTitle>
+                        <DialogDescription>{selectedBill.projectName ?? project.name}</DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-5 py-2">
+                        <div className="rounded-lg border p-4 bg-muted/30 text-center">
+                          <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Bill Amount</p>
+                          <p className="text-3xl font-bold text-primary">{INR.format(selectedBill.amount)}</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Bill Number</p>
+                            <p className="font-medium font-mono">{selectedBill.billNumber}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Date</p>
+                            <p className="font-medium">{format(new Date(selectedBill.createdAt), "MMM d, yyyy")}</p>
+                          </div>
+                          {selectedBill.milestone && (
+                            <div className="col-span-2">
+                              <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Milestone</p>
+                              <p className="font-medium">{selectedBill.milestone}</p>
+                            </div>
+                          )}
+                          {selectedBill.description && (
+                            <div className="col-span-2">
+                              <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Description</p>
+                              <p className="text-muted-foreground">{selectedBill.description}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <DialogFooter className="gap-2">
+                        <Button variant="outline" onClick={() => setSelectedBill(null)}>Close</Button>
+                        <Button onClick={() => handlePrintBill(selectedBill)} className="gap-2">
+                          <Printer className="h-4 w-4" /> Print / Save PDF
+                        </Button>
+                      </DialogFooter>
+                    </>
+                  )}
+                </DialogContent>
+              </Dialog>
 
               {/* ── Stakeholders ── */}
               <TabsContent value="stakeholders" className="m-0 space-y-4">
@@ -836,11 +1009,22 @@ export default function ProjectDetail() {
                     <Card key={sh.id}>
                       <CardContent className="p-4">
                         <div className="flex justify-between items-start mb-2">
-                          <div>
+                          <div className="min-w-0">
                             <div className="font-bold">{sh.name}</div>
                             <div className="text-sm text-muted-foreground">{sh.role}{sh.organization && ` • ${sh.organization}`}</div>
                           </div>
-                          <Badge variant="outline">{sh.accessLevel}</Badge>
+                          <div className="flex items-center gap-1 shrink-0 ml-2">
+                            <Badge variant="outline">{sh.accessLevel}</Badge>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7"
+                              title="Edit stakeholder"
+                              onClick={() => openEditStakeholder(sh)}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
                         </div>
                         <div className="text-sm space-y-1 mt-3">
                           {sh.email && <div><a href={`mailto:${sh.email}`} className="text-primary hover:underline">{sh.email}</a></div>}
@@ -854,6 +1038,59 @@ export default function ProjectDetail() {
                   )}
                 </div>
               </TabsContent>
+
+              {/* ── Stakeholder Edit Dialog ── */}
+              <Dialog open={!!editingStakeholder} onOpenChange={(o) => !o && setEditingStakeholder(null)}>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Edit Stakeholder</DialogTitle>
+                    <DialogDescription>Update contact info and role for this stakeholder.</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="sh-name">Name <span className="text-destructive">*</span></Label>
+                      <Input id="sh-name" value={shForm.name} onChange={e => setShForm(f => ({ ...f, name: e.target.value }))} placeholder="Full name" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="sh-role">Role / Title</Label>
+                      <Input id="sh-role" value={shForm.role} onChange={e => setShForm(f => ({ ...f, role: e.target.value }))} placeholder="e.g. Project Manager, Client" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="sh-org">Organisation</Label>
+                      <Input id="sh-org" value={shForm.organization} onChange={e => setShForm(f => ({ ...f, organization: e.target.value }))} placeholder="Company or firm" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="sh-email">Email</Label>
+                        <Input id="sh-email" type="email" value={shForm.email} onChange={e => setShForm(f => ({ ...f, email: e.target.value }))} placeholder="email@example.com" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="sh-phone">Phone</Label>
+                        <Input id="sh-phone" value={shForm.phone} onChange={e => setShForm(f => ({ ...f, phone: e.target.value }))} placeholder="+91 ..." />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="sh-access">Access Level</Label>
+                      <Select value={shForm.accessLevel} onValueChange={v => setShForm(f => ({ ...f, accessLevel: v }))}>
+                        <SelectTrigger id="sh-access">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="read">Read — view only</SelectItem>
+                          <SelectItem value="write">Write — can update</SelectItem>
+                          <SelectItem value="admin">Admin — full access</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setEditingStakeholder(null)} disabled={updateStakeholder.isPending}>Cancel</Button>
+                    <Button onClick={handleSaveStakeholder} disabled={updateStakeholder.isPending || !shForm.name.trim()}>
+                      {updateStakeholder.isPending ? "Saving…" : "Save Changes"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
 
               {/* ── Documents ── */}
               <TabsContent value="documents" className="m-0 space-y-4">

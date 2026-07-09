@@ -7240,6 +7240,80 @@ export const useCreateStakeholder = <
   return useMutation(getCreateStakeholderMutationOptions(options));
 };
 
+export const getUpdateStakeholderUrl = (id: number) => {
+  return `/api/stakeholders/${id}`;
+};
+
+export const updateStakeholder = async (
+  id: number,
+  stakeholderUpdate: import("./api.schemas").StakeholderUpdate,
+  options?: RequestInit,
+): Promise<Stakeholder> => {
+  return customFetch<Stakeholder>(getUpdateStakeholderUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(stakeholderUpdate),
+  });
+};
+
+export const getUpdateStakeholderMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateStakeholder>>,
+    TError,
+    { id: number; data: import("./api.schemas").StakeholderUpdate },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateStakeholder>>,
+  TError,
+  { id: number; data: import("./api.schemas").StakeholderUpdate },
+  TContext
+> => {
+  const mutationKey = ["updateStakeholder"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateStakeholder>>,
+    { id: number; data: import("./api.schemas").StakeholderUpdate }
+  > = (props) => {
+    const { id, data } = props ?? {};
+    return updateStakeholder(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export const useUpdateStakeholder = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateStakeholder>>,
+    TError,
+    { id: number; data: import("./api.schemas").StakeholderUpdate },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateStakeholder>>,
+  TError,
+  { id: number; data: import("./api.schemas").StakeholderUpdate },
+  TContext
+> => {
+  return useMutation(getUpdateStakeholderMutationOptions(options));
+};
+
 export const getListCommunicationsUrl = (params?: ListCommunicationsParams) => {
   const normalizedParams = new URLSearchParams();
 
