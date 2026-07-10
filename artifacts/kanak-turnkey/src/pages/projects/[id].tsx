@@ -9,6 +9,8 @@ import {
   useListStakeholders, getListStakeholdersQueryKey,
   useListDocuments, getListDocumentsQueryKey,
   useListPunchListItems, getListPunchListItemsQueryKey,
+  useListPunchListItemComments, getListPunchListItemCommentsQueryKey,
+  useCreatePunchListItemComment,
   useCreatePunchListItem,
   useUpdatePunchListItem,
   useUpdateProject,
@@ -19,6 +21,7 @@ import {
   useUpdateStakeholder,
   type RaBill,
   type Stakeholder,
+  type PunchListItem,
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -37,7 +40,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   ChevronLeft, Plus, FileText, CheckCircle2, Circle, Clock,
   AlertCircle, CheckCheck, ArrowRight, ClipboardList, LayoutTemplate,
-  Eye, Pencil, Printer,
+  Eye, Pencil, Printer, MessageSquare, Camera, Upload, X, Send,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -109,6 +112,16 @@ export default function ProjectDetail() {
   const [editingStakeholder, setEditingStakeholder] = useState<Stakeholder | null>(null);
   const [shForm, setShForm] = useState({ name: "", email: "", phone: "", organization: "", role: "", accessLevel: "read" });
   const updateStakeholder = useUpdateStakeholder();
+
+  // Punch list detail drawer
+  const [detailItem, setDetailItem] = useState<PunchListItem | null>(null);
+  const [commentText, setCommentText] = useState("");
+  const updatePunchPhotos = useUpdatePunchListItem();
+  const addComment = useCreatePunchListItemComment();
+  const { data: itemComments = [] } = useListPunchListItemComments(
+    detailItem?.id ?? 0,
+    { query: { enabled: !!detailItem, queryKey: getListPunchListItemCommentsQueryKey(detailItem?.id ?? 0) } },
+  );
 
   const { data: templates } = useListTaskTemplates();
   const { data: previewTemplate } = useGetTaskTemplate(
@@ -256,6 +269,42 @@ export default function ProjectDetail() {
     });
     await qc.invalidateQueries({ queryKey: getListStakeholdersQueryKey({ projectId }) });
     setEditingStakeholder(null);
+  };
+
+  // ── Punch list photo upload ───────────────────────────────────────────────
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!detailItem || !e.target.files?.length) return;
+    const files = Array.from(e.target.files);
+    const toDataURL = (f: File): Promise<string> =>
+      new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result as string);
+        r.onerror = rej;
+        r.readAsDataURL(f);
+      });
+    const newDataUrls = await Promise.all(files.map(toDataURL));
+    const photos = [...(detailItem.photos ?? []), ...newDataUrls];
+    await updatePunchPhotos.mutateAsync({ id: detailItem.id, data: { photos } });
+    await qc.invalidateQueries({ queryKey: getListPunchListItemsQueryKey({ projectId }) });
+    // update local state so photos appear instantly
+    setDetailItem(prev => prev ? { ...prev, photos } : null);
+    e.target.value = "";
+  };
+
+  const handleRemovePhoto = async (idx: number) => {
+    if (!detailItem) return;
+    const photos = detailItem.photos.filter((_, i) => i !== idx);
+    await updatePunchPhotos.mutateAsync({ id: detailItem.id, data: { photos } });
+    await qc.invalidateQueries({ queryKey: getListPunchListItemsQueryKey({ projectId }) });
+    setDetailItem(prev => prev ? { ...prev, photos } : null);
+  };
+
+  // ── Punch list comment submit ─────────────────────────────────────────────
+  const handleAddComment = async () => {
+    if (!detailItem || !commentText.trim()) return;
+    await addComment.mutateAsync({ id: detailItem.id, data: { text: commentText.trim(), authorName: "" } });
+    await qc.invalidateQueries({ queryKey: getListPunchListItemCommentsQueryKey(detailItem.id) });
+    setCommentText("");
   };
 
   return (
@@ -800,11 +849,23 @@ export default function ProjectDetail() {
                         return (
                           <tr key={item.id} className="hover:bg-accent/40 transition-colors">
                             <td className="px-4 py-3">
-                              <div className="font-medium">{item.title}</div>
-                              {item.description && <div className="text-xs text-muted-foreground line-clamp-1">{item.description}</div>}
-                              {item.resolvedAt && (
-                                <div className="text-[10px] text-emerald-600 mt-0.5">Resolved {format(new Date(item.resolvedAt), "MMM d, yyyy")}</div>
-                              )}
+                              <button
+                                className="text-left group"
+                                onClick={() => { setDetailItem(item); setCommentText(""); }}
+                              >
+                                <div className="font-medium group-hover:text-primary transition-colors">{item.title}</div>
+                                {item.description && <div className="text-xs text-muted-foreground line-clamp-1">{item.description}</div>}
+                                {item.resolvedAt && (
+                                  <div className="text-[10px] text-emerald-600 mt-0.5">Resolved {format(new Date(item.resolvedAt), "MMM d, yyyy")}</div>
+                                )}
+                              </button>
+                              <div className="flex items-center gap-2 mt-1">
+                                {(item.photos?.length ?? 0) > 0 && (
+                                  <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
+                                    <Camera className="h-2.5 w-2.5" />{item.photos.length}
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td className="px-4 py-3 capitalize">
                               <Badge variant="outline" className="text-[10px]">{item.category}</Badge>
@@ -822,22 +883,27 @@ export default function ProjectDetail() {
                               {item.dueDate ? format(new Date(item.dueDate), "MMM d") : "—"}
                             </td>
                             <td className="px-4 py-3">
-                              {!isResolved ? (
-                                <div className="flex gap-1">
-                                  {item.status === "open" && (
-                                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => handlePunchStatus(item.id, "in_progress")}>
-                                      Start
-                                    </Button>
-                                  )}
-                                  <Button size="sm" className="h-7 text-xs gap-1" onClick={() => handlePunchStatus(item.id, "resolved")}>
-                                    <CheckCircle2 className="h-3 w-3" /> Resolve
-                                  </Button>
-                                </div>
-                              ) : (
-                                <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" onClick={() => handlePunchStatus(item.id, "open")}>
-                                  Reopen
+                              <div className="flex gap-1 items-center">
+                                <Button size="icon" variant="ghost" className="h-7 w-7" title="Photos & Comments" onClick={() => { setDetailItem(item); setCommentText(""); }}>
+                                  <MessageSquare className="h-3.5 w-3.5" />
                                 </Button>
-                              )}
+                                {!isResolved ? (
+                                  <>
+                                    {item.status === "open" && (
+                                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => handlePunchStatus(item.id, "in_progress")}>
+                                        Start
+                                      </Button>
+                                    )}
+                                    <Button size="sm" className="h-7 text-xs gap-1" onClick={() => handlePunchStatus(item.id, "resolved")}>
+                                      <CheckCircle2 className="h-3 w-3" /> Resolve
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" onClick={() => handlePunchStatus(item.id, "open")}>
+                                    Reopen
+                                  </Button>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         );
@@ -854,6 +920,172 @@ export default function ProjectDetail() {
                   </table>
                 </div>
               </TabsContent>
+
+              {/* ── Punch List Detail Dialog ── */}
+              <Dialog open={!!detailItem} onOpenChange={(o) => { if (!o) setDetailItem(null); }}>
+                <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden p-0">
+                  {detailItem && (
+                    <>
+                      {/* Header */}
+                      <div className="px-6 pt-6 pb-4 border-b shrink-0">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <DialogTitle className="text-lg font-semibold leading-tight">{detailItem.title}</DialogTitle>
+                            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                              <Badge variant="outline" className="capitalize text-[10px]">{detailItem.category}</Badge>
+                              <Badge variant={PL_PRIORITY[detailItem.priority]} className="capitalize text-[10px]">{detailItem.priority}</Badge>
+                              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                                <span className={`h-2 w-2 rounded-full ${PL_STATUS[detailItem.status]?.dot}`} />
+                                {PL_STATUS[detailItem.status]?.label}
+                              </span>
+                              {detailItem.dueDate && (
+                                <span className="text-xs text-muted-foreground">Due {format(new Date(detailItem.dueDate), "MMM d, yyyy")}</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        {detailItem.description && (
+                          <p className="text-sm text-muted-foreground mt-3">{detailItem.description}</p>
+                        )}
+                      </div>
+
+                      {/* Scrollable body */}
+                      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+                        {/* Photos */}
+                        <div>
+                          <div className="flex items-center justify-between mb-3">
+                            <h3 className="text-sm font-semibold flex items-center gap-2">
+                              <Camera className="h-4 w-4 text-primary" /> Photos
+                              {detailItem.photos?.length > 0 && (
+                                <span className="text-xs font-normal text-muted-foreground">({detailItem.photos.length})</span>
+                              )}
+                            </h3>
+                            <label className="cursor-pointer">
+                              <input
+                                type="file"
+                                accept="image/*"
+                                multiple
+                                className="hidden"
+                                onChange={handlePhotoUpload}
+                                disabled={updatePunchPhotos.isPending}
+                              />
+                              <span className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md border border-input bg-background hover:bg-accent transition-colors">
+                                <Upload className="h-3.5 w-3.5" />
+                                {updatePunchPhotos.isPending ? "Uploading…" : "Add Photos"}
+                              </span>
+                            </label>
+                          </div>
+                          {detailItem.photos?.length > 0 ? (
+                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                              {detailItem.photos.map((src, idx) => (
+                                <div key={idx} className="relative group aspect-square rounded-md overflow-hidden border bg-muted">
+                                  <img src={src} alt={`Photo ${idx + 1}`} className="w-full h-full object-cover" />
+                                  <button
+                                    className="absolute top-1 right-1 p-0.5 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onClick={() => handleRemovePhoto(idx)}
+                                    title="Remove photo"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <label className="cursor-pointer block">
+                              <input type="file" accept="image/*" multiple className="hidden" onChange={handlePhotoUpload} disabled={updatePunchPhotos.isPending} />
+                              <div className="border-2 border-dashed rounded-lg p-8 text-center text-muted-foreground hover:border-primary/40 hover:bg-accent/20 transition-colors">
+                                <Camera className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                                <p className="text-sm">Click to upload site photos</p>
+                                <p className="text-xs mt-1 opacity-60">JPG, PNG, HEIC supported</p>
+                              </div>
+                            </label>
+                          )}
+                        </div>
+
+                        {/* Comments */}
+                        <div>
+                          <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                            <MessageSquare className="h-4 w-4 text-primary" /> Comments
+                            {itemComments.length > 0 && (
+                              <span className="text-xs font-normal text-muted-foreground">({itemComments.length})</span>
+                            )}
+                          </h3>
+                          {itemComments.length > 0 ? (
+                            <div className="space-y-3 mb-4">
+                              {itemComments.map(c => (
+                                <div key={c.id} className="flex gap-3">
+                                  <div className="flex-shrink-0 h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary uppercase">
+                                    {c.authorName.charAt(0)}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-baseline gap-2">
+                                      <span className="text-xs font-semibold">{c.authorName}</span>
+                                      <span className="text-[10px] text-muted-foreground">{format(new Date(c.createdAt), "MMM d, h:mm a")}</span>
+                                    </div>
+                                    <p className="text-sm mt-0.5 text-muted-foreground whitespace-pre-wrap break-words">{c.text}</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-muted-foreground mb-4">No comments yet. Add a note or observation below.</p>
+                          )}
+                          <div className="flex gap-2 items-end">
+                            <Textarea
+                              placeholder="Add a comment or field note…"
+                              value={commentText}
+                              onChange={e => setCommentText(e.target.value)}
+                              onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleAddComment(); }}
+                              rows={2}
+                              className="resize-none flex-1 text-sm"
+                            />
+                            <Button
+                              size="icon"
+                              className="h-9 w-9 shrink-0"
+                              onClick={handleAddComment}
+                              disabled={!commentText.trim() || addComment.isPending}
+                              title="Send (Ctrl+Enter)"
+                            >
+                              <Send className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Footer */}
+                      <div className="px-6 py-4 border-t bg-muted/30 shrink-0 flex justify-between items-center gap-3">
+                        <div className="flex gap-2">
+                          {(detailItem.status === "open" || detailItem.status === "in_progress") && (
+                            <Button size="sm" className="gap-1.5" onClick={async () => {
+                              await handlePunchStatus(detailItem.id, "resolved");
+                              setDetailItem(prev => prev ? { ...prev, status: "resolved" as const } : null);
+                            }}>
+                              <CheckCircle2 className="h-3.5 w-3.5" /> Mark Resolved
+                            </Button>
+                          )}
+                          {(detailItem.status === "resolved" || detailItem.status === "closed") && (
+                            <Button size="sm" variant="outline" onClick={async () => {
+                              await handlePunchStatus(detailItem.id, "open");
+                              setDetailItem(prev => prev ? { ...prev, status: "open" as const } : null);
+                            }}>
+                              Reopen
+                            </Button>
+                          )}
+                          {detailItem.status === "open" && (
+                            <Button size="sm" variant="outline" onClick={async () => {
+                              await handlePunchStatus(detailItem.id, "in_progress");
+                              setDetailItem(prev => prev ? { ...prev, status: "in_progress" as const } : null);
+                            }}>
+                              Start
+                            </Button>
+                          )}
+                        </div>
+                        <Button variant="outline" size="sm" onClick={() => setDetailItem(null)}>Close</Button>
+                      </div>
+                    </>
+                  )}
+                </DialogContent>
+              </Dialog>
 
               {/* ── Budget ── */}
               <TabsContent value="budget" className="m-0 space-y-4">

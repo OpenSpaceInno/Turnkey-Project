@@ -6166,6 +6166,135 @@ export const useDeletePunchListItem = <
   return useMutation(getDeletePunchListItemMutationOptions(options));
 };
 
+// ── Punch List Item Comments ──────────────────────────────────────────────────
+
+export const getListPunchListItemCommentsUrl = (id: number) =>
+  `/api/punch-list-items/${id}/comments`;
+
+export const listPunchListItemComments = async (
+  id: number,
+  options?: RequestInit,
+) =>
+  customFetch<import("./api.schemas").PunchListItemComment[]>(
+    getListPunchListItemCommentsUrl(id),
+    { ...options, method: "GET" },
+  );
+
+export const getListPunchListItemCommentsQueryKey = (id: number) =>
+  [`/api/punch-list-items/${id}/comments`] as const;
+
+export const getListPunchListItemCommentsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listPunchListItemComments>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listPunchListItemComments>>,
+      TError,
+      TData
+    >;
+    request?: RequestInit;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+  const queryKey =
+    queryOptions?.queryKey ?? getListPunchListItemCommentsQueryKey(id);
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listPunchListItemComments>>
+  > = ({ signal }) => listPunchListItemComments(id, { signal, ...requestOptions });
+  return { queryKey, queryFn, enabled: !!id, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listPunchListItemComments>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export const useListPunchListItemComments = <
+  TData = Awaited<ReturnType<typeof listPunchListItemComments>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listPunchListItemComments>>,
+      TError,
+      TData
+    >;
+    request?: RequestInit;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
+  const queryOptions = getListPunchListItemCommentsQueryOptions(id, options);
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+  query.queryKey = queryOptions.queryKey;
+  return query;
+};
+
+export const createPunchListItemComment = async (
+  id: number,
+  data: import("./api.schemas").PunchListItemCommentInput,
+  options?: RequestInit,
+) =>
+  customFetch<import("./api.schemas").PunchListItemComment>(
+    getListPunchListItemCommentsUrl(id),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(data),
+    },
+  );
+
+export const getCreatePunchListItemCommentMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createPunchListItemComment>>,
+    TError,
+    { id: number; data: import("./api.schemas").PunchListItemCommentInput },
+    TContext
+  >;
+  request?: RequestInit;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createPunchListItemComment>>,
+  TError,
+  { id: number; data: import("./api.schemas").PunchListItemCommentInput },
+  TContext
+> => {
+  const { mutation: mutationOptions, request: requestOptions } = options ?? {};
+  const mutationFn = async ({
+    id,
+    data,
+  }: {
+    id: number;
+    data: import("./api.schemas").PunchListItemCommentInput;
+  }) => createPunchListItemComment(id, data, requestOptions);
+  return { mutationFn, ...mutationOptions };
+};
+
+export const useCreatePunchListItemComment = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createPunchListItemComment>>,
+    TError,
+    { id: number; data: import("./api.schemas").PunchListItemCommentInput },
+    TContext
+  >;
+  request?: RequestInit;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createPunchListItemComment>>,
+  TError,
+  { id: number; data: import("./api.schemas").PunchListItemCommentInput },
+  TContext
+> => {
+  return useMutation(getCreatePunchListItemCommentMutationOptions(options));
+};
+
 export const getListRfqsUrl = () => {
   return `/api/rfqs`;
 };

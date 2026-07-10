@@ -9,6 +9,7 @@ import {
   boolean,
   numeric,
   doublePrecision,
+  jsonb,
 } from "drizzle-orm/pg-core";
 
 const ts = () => ({
@@ -425,7 +426,16 @@ export const punchListItemsTable = pgTable("punch_list_items", {
   resolvedAt: timestamp("resolved_at", { withTimezone: true }),
   resolvedById: integer("resolved_by_id"),
   createdById: integer("created_by_id"),
+  photos: jsonb("photos").notNull().default([]),
   ...ts(),
+});
+
+export const punchListItemCommentsTable = pgTable("punch_list_item_comments", {
+  id: serial("id").primaryKey(),
+  punchListItemId: integer("punch_list_item_id").notNull(),
+  authorName: varchar("author_name", { length: 255 }).notNull(),
+  text: text("text").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const notificationsTable = pgTable("notifications", {

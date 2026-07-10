@@ -1966,8 +1966,22 @@ export interface PunchListItem {
   resolvedById?: number | null;
   /** @nullable */
   createdById?: number | null;
+  photos: string[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface PunchListItemComment {
+  id: number;
+  punchListItemId: number;
+  authorName: string;
+  text: string;
+  createdAt: string;
+}
+
+export interface PunchListItemCommentInput {
+  authorName: string;
+  text: string;
 }
 
 export type PunchListItemInputCategory =
@@ -2067,6 +2081,8 @@ export interface PunchListItemUpdate {
   assignedToId?: number | null;
   /** @nullable */
   dueDate?: string | null;
+  /** @nullable */
+  photos?: string[] | null;
 }
 
 export interface AuditLog {

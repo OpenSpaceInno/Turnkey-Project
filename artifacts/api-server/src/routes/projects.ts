@@ -9,6 +9,7 @@ import {
   stakeholdersTable,
   usersTable,
   punchListItemsTable,
+  punchListItemCommentsTable,
 } from "@workspace/db";
 import { numKeys } from "../lib/transforms";
 import { getCurrentUser } from "../lib/session";
@@ -254,6 +255,17 @@ router.patch("/punch-list-items/:id", async (req, res): Promise<void> => {
   for (const k of ["title", "description", "category", "priority", "status", "assignedToId", "dueDate"]) {
     if (b[k] !== undefined) update[k] = b[k];
   }
+  if (b.photos !== undefined) {
+    if (!Array.isArray(b.photos)) {
+      res.status(400).json({ error: "photos must be an array of strings" });
+      return;
+    }
+    if (b.photos.length > 20) {
+      res.status(400).json({ error: "Maximum 20 photos per item" });
+      return;
+    }
+    update.photos = b.photos;
+  }
   if (b.status === "resolved" || b.status === "closed") {
     const me = await getCurrentUser();
     update.resolvedAt = new Date();
@@ -278,6 +290,40 @@ router.delete("/punch-list-items/:id", async (req, res): Promise<void> => {
   const id = parseInt(req.params.id as string, 10);
   await db.delete(punchListItemsTable).where(eq(punchListItemsTable.id, id));
   res.sendStatus(204);
+});
+
+// Punch List Item Comments
+router.get("/punch-list-items/:id/comments", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id as string, 10);
+  if (Number.isNaN(id) || id <= 0) { res.status(400).json({ error: "Invalid id" }); return; }
+  const rows = await db
+    .select()
+    .from(punchListItemCommentsTable)
+    .where(eq(punchListItemCommentsTable.punchListItemId, id))
+    .orderBy(asc(punchListItemCommentsTable.createdAt));
+  res.json(rows);
+});
+
+router.post("/punch-list-items/:id/comments", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id as string, 10);
+  if (Number.isNaN(id) || id <= 0) { res.status(400).json({ error: "Invalid id" }); return; }
+  // Verify parent exists
+  const [parent] = await db.select({ id: punchListItemsTable.id }).from(punchListItemsTable).where(eq(punchListItemsTable.id, id)).limit(1);
+  if (!parent) { res.status(404).json({ error: "Punch list item not found" }); return; }
+  const b = req.body ?? {};
+  const text = (b.text ?? "").toString().trim();
+  if (!text) { res.status(400).json({ error: "text is required" }); return; }
+  // Author identity always comes from session, never client input
+  const me = await getCurrentUser();
+  const [comment] = await db
+    .insert(punchListItemCommentsTable)
+    .values({
+      punchListItemId: id,
+      authorName: me.name,
+      text,
+    })
+    .returning();
+  res.status(201).json(comment);
 });
 
 router.get("/projects/:projectId/budget", async (req, res): Promise<void> => {
