@@ -472,6 +472,22 @@ export const taskTemplateItemsTable = pgTable("task_template_items", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const companySettingsTable = pgTable("company_settings", {
+  id: serial("id").primaryKey(),
+  companyName: varchar("company_name", { length: 255 }).notNull().default(""),
+  address: text("address"),
+  city: varchar("city", { length: 100 }),
+  state: varchar("state", { length: 100 }),
+  country: varchar("country", { length: 100 }).default("India"),
+  pincode: varchar("pincode", { length: 20 }),
+  currency: varchar("currency", { length: 10 }).notNull().default("INR"),
+  gstNumber: varchar("gst_number", { length: 50 }),
+  phone: varchar("phone", { length: 30 }),
+  email: varchar("email", { length: 255 }),
+  website: varchar("website", { length: 255 }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const auditLogsTable = pgTable("audit_logs", {
   id: serial("id").primaryKey(),
   userId: integer("user_id"),

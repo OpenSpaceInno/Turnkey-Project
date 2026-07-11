@@ -8316,3 +8316,74 @@ export function useListAuditLogs<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+// ── Company Settings ──────────────────────────────────────────────────────────
+
+export const getCompanySettingsUrl = () => `/api/settings/company`;
+export const getCompanySettingsQueryKey = () => [`/api/settings/company`] as const;
+
+export const getCompanySettings = async (options?: RequestInit): Promise<import("./api.schemas").CompanySettings> =>
+  customFetch<import("./api.schemas").CompanySettings>(getCompanySettingsUrl(), { ...options });
+
+export const getGetCompanySettingsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCompanySettings>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<Awaited<ReturnType<typeof getCompanySettings>>, TError, TData>;
+  request?: RequestInit;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+  const queryKey = queryOptions?.queryKey ?? getCompanySettingsQueryKey();
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getCompanySettings>>> = ({ signal }) =>
+    getCompanySettings({ signal, ...requestOptions });
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getCompanySettings>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export const useGetCompanySettings = <
+  TData = Awaited<ReturnType<typeof getCompanySettings>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<Awaited<ReturnType<typeof getCompanySettings>>, TError, TData>;
+  request?: RequestInit;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } => {
+  const queryOptions = getGetCompanySettingsQueryOptions(options);
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  query.queryKey = queryOptions.queryKey;
+  return query;
+};
+
+export const updateCompanySettings = async (
+  data: import("./api.schemas").CompanySettingsInput,
+  options?: RequestInit,
+): Promise<import("./api.schemas").CompanySettings> =>
+  customFetch<import("./api.schemas").CompanySettings>(getCompanySettingsUrl(), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(data),
+  });
+
+export const useUpdateCompanySettings = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateCompanySettings>>,
+    TError,
+    import("./api.schemas").CompanySettingsInput,
+    TContext
+  >;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateCompanySettings>>,
+  TError,
+  import("./api.schemas").CompanySettingsInput,
+  TContext
+> => {
+  const mutationFn = (data: import("./api.schemas").CompanySettingsInput) =>
+    updateCompanySettings(data);
+  return useMutation({ mutationFn, ...options?.mutation });
+};

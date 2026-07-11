@@ -2139,6 +2139,45 @@ export type ListCommunicationsParams = {
   projectId?: number;
 };
 
+export interface CompanySettings {
+  id: number;
+  companyName: string;
+  /** @nullable */
+  address?: string | null;
+  /** @nullable */
+  city?: string | null;
+  /** @nullable */
+  state?: string | null;
+  /** @nullable */
+  country?: string | null;
+  /** @nullable */
+  pincode?: string | null;
+  currency: string;
+  /** @nullable */
+  gstNumber?: string | null;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  email?: string | null;
+  /** @nullable */
+  website?: string | null;
+  updatedAt: string;
+}
+
+export interface CompanySettingsInput {
+  companyName?: string;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+  pincode?: string | null;
+  currency?: string;
+  gstNumber?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  website?: string | null;
+}
+
 export type ListMeetingsParams = {
   projectId?: number;
 };
