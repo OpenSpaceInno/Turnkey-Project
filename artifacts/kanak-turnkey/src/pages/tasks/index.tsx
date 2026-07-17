@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { useListTasks, useListProjects, type Task } from "@workspace/api-client-react";
+import { useListTasks, useListProjects, useUpdateTask, type Task } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -49,6 +50,52 @@ const PRIORITY_VARIANT: Record<string, "destructive" | "secondary" | "outline"> 
   medium: "secondary",
   low: "outline",
 };
+
+const STATUS_OPTIONS = [
+  { value: "todo", label: "Todo" },
+  { value: "in_progress", label: "In Progress" },
+  { value: "in_review", label: "In Review" },
+  { value: "completed", label: "Completed" },
+] as const;
+
+function StatusSelect({ task }: { task: Task }) {
+  const qc = useQueryClient();
+  const { mutate, isPending } = useUpdateTask({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: ["/api/tasks"] });
+      },
+    },
+  });
+
+  return (
+    <Select
+      value={task.status}
+      disabled={isPending}
+      onValueChange={(val) =>
+        mutate({ id: task.id, data: { status: val as Task["status"] } })
+      }
+    >
+      <SelectTrigger
+        className="h-7 text-xs px-2 gap-1 w-[120px]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${STATUS_META[task.status]?.dot}`} />
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent onClick={(e) => e.stopPropagation()}>
+        {STATUS_OPTIONS.map((s) => (
+          <SelectItem key={s.value} value={s.value} className="text-xs">
+            <span className="flex items-center gap-2">
+              <span className={`h-1.5 w-1.5 rounded-full ${STATUS_META[s.value]?.dot}`} />
+              {s.label}
+            </span>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
 
 export default function Tasks() {
   const { data: tasks, isLoading } = useListTasks();
@@ -232,6 +279,9 @@ function BoardView({
                         </span>
                       )}
                     </div>
+                    <div className="pt-1">
+                      <StatusSelect task={task} />
+                    </div>
                   </CardContent>
                 </Card>
               ))}
@@ -301,10 +351,7 @@ function ListView({
                   </td>
                   <td className="px-4 py-3">{t.assignedToName ?? <span className="text-muted-foreground">Unassigned</span>}</td>
                   <td className="px-4 py-3">
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className={`h-2 w-2 rounded-full ${meta.dot}`} />
-                      <span className="text-xs">{meta.label}</span>
-                    </span>
+                    <StatusSelect task={t} />
                   </td>
                   <td className="px-4 py-3">
                     <Badge variant={PRIORITY_VARIANT[t.priority]} className="text-[10px] capitalize">
