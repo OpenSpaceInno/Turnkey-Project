@@ -20,6 +20,11 @@ import {
   useUpdateRaBill,
   useUpdateStakeholder,
   useUpdateTask,
+  useCreateTask,
+  useCreateBudgetItem,
+  useCreateRaBill,
+  useCreateStakeholder,
+  useCreateDocument,
   type RaBill,
   type Stakeholder,
   type PunchListItem,
@@ -96,7 +101,7 @@ function TaskStatusSelect({ task, projectId }: { task: Task; projectId: number }
     <Select
       value={task.status}
       disabled={isPending}
-      onValueChange={(val) => mutate({ id: task.id, data: { status: val as Task["status"] } })}
+      onValueChange={(val) => mutate({ id: task.id, data: { status: val as Task["status"] } as any })}
     >
       <SelectTrigger
         className="h-7 text-xs px-2 gap-1 w-[120px]"
@@ -173,6 +178,31 @@ export default function ProjectDetail() {
     { query: { enabled: !!selectedTemplateId, queryKey: getGetTaskTemplateQueryKey(selectedTemplateId ? parseInt(selectedTemplateId) : 0) } }
   );
   const applyTemplate = useApplyTaskTemplate();
+
+  // ── Add Task ──────────────────────────────────────────────────────────────
+  const [addTaskOpen, setAddTaskOpen] = useState(false);
+  const [taskForm, setTaskForm] = useState({ title: "", description: "", priority: "medium", startDate: "", endDate: "" });
+  const createTask = useCreateTask();
+
+  // ── Add Budget Item ───────────────────────────────────────────────────────
+  const [addBudgetOpen, setAddBudgetOpen] = useState(false);
+  const [budgetForm, setBudgetForm] = useState({ costCode: "", description: "", budgeted: "", actual: "0", committed: "0" });
+  const createBudgetItem = useCreateBudgetItem();
+
+  // ── Create RA Bill ────────────────────────────────────────────────────────
+  const [createBillOpen, setCreateBillOpen] = useState(false);
+  const [billForm, setBillForm] = useState({ billNumber: "", description: "", amount: "", milestone: "" });
+  const createRaBill = useCreateRaBill();
+
+  // ── Add Stakeholder ───────────────────────────────────────────────────────
+  const [addStakeholderOpen, setAddStakeholderOpen] = useState(false);
+  const [newShForm, setNewShForm] = useState({ name: "", email: "", phone: "", organization: "", role: "", accessLevel: "read" });
+  const createStakeholder = useCreateStakeholder();
+
+  // ── Upload Document ───────────────────────────────────────────────────────
+  const [uploadDocOpen, setUploadDocOpen] = useState(false);
+  const [docForm, setDocForm] = useState({ fileName: "", category: "general", fileType: "", fileUrl: "" });
+  const createDocument = useCreateDocument();
 
   if (isLoading) return <div className="p-6">Loading project details...</div>;
   if (!project)  return <div className="p-6 text-destructive">Project not found</div>;
@@ -349,6 +379,96 @@ export default function ProjectDetail() {
     await addComment.mutateAsync({ id: detailItem.id, data: { text: commentText.trim(), authorName: "" } });
     await qc.invalidateQueries({ queryKey: getListPunchListItemCommentsQueryKey(detailItem.id) });
     setCommentText("");
+  };
+
+  // ── Create Task ───────────────────────────────────────────────────────────
+  const handleCreateTask = async () => {
+    if (!taskForm.title.trim()) return;
+    await createTask.mutateAsync({
+      data: {
+        projectId,
+        title: taskForm.title,
+        description: taskForm.description || null,
+        priority: taskForm.priority as "low" | "medium" | "high",
+        status: "todo",
+        startDate: taskForm.startDate || null,
+        endDate: taskForm.endDate || null,
+      },
+    });
+    await qc.invalidateQueries({ queryKey: getListTasksQueryKey({ projectId }) });
+    setAddTaskOpen(false);
+    setTaskForm({ title: "", description: "", priority: "medium", startDate: "", endDate: "" });
+  };
+
+  // ── Create Budget Item ────────────────────────────────────────────────────
+  const handleCreateBudgetItem = async () => {
+    if (!budgetForm.costCode.trim() || !budgetForm.description.trim() || !budgetForm.budgeted) return;
+    await createBudgetItem.mutateAsync({
+      projectId,
+      data: {
+        costCode: budgetForm.costCode,
+        description: budgetForm.description,
+        budgeted: parseFloat(budgetForm.budgeted),
+        actual: parseFloat(budgetForm.actual) || 0,
+        committed: parseFloat(budgetForm.committed) || 0,
+      },
+    });
+    await qc.invalidateQueries({ queryKey: getListBudgetItemsQueryKey(projectId) });
+    setAddBudgetOpen(false);
+    setBudgetForm({ costCode: "", description: "", budgeted: "", actual: "0", committed: "0" });
+  };
+
+  // ── Create RA Bill ────────────────────────────────────────────────────────
+  const handleCreateRaBill = async () => {
+    if (!billForm.billNumber.trim() || !billForm.amount) return;
+    await createRaBill.mutateAsync({
+      data: {
+        projectId,
+        billNumber: billForm.billNumber,
+        description: billForm.description || null,
+        amount: parseFloat(billForm.amount),
+        milestone: billForm.milestone || null,
+      },
+    });
+    await qc.invalidateQueries({ queryKey: getListRaBillsQueryKey({ projectId }) });
+    setCreateBillOpen(false);
+    setBillForm({ billNumber: "", description: "", amount: "", milestone: "" });
+  };
+
+  // ── Create Stakeholder ────────────────────────────────────────────────────
+  const handleCreateStakeholder = async () => {
+    if (!newShForm.name.trim()) return;
+    await createStakeholder.mutateAsync({
+      data: {
+        projectId,
+        name: newShForm.name,
+        email: newShForm.email || null,
+        phone: newShForm.phone || null,
+        organization: newShForm.organization || null,
+        role: newShForm.role || null,
+        accessLevel: newShForm.accessLevel as "read" | "write" | "admin",
+      },
+    });
+    await qc.invalidateQueries({ queryKey: getListStakeholdersQueryKey({ projectId }) });
+    setAddStakeholderOpen(false);
+    setNewShForm({ name: "", email: "", phone: "", organization: "", role: "", accessLevel: "read" });
+  };
+
+  // ── Create Document ───────────────────────────────────────────────────────
+  const handleCreateDocument = async () => {
+    if (!docForm.fileName.trim()) return;
+    await createDocument.mutateAsync({
+      data: {
+        projectId,
+        fileName: docForm.fileName,
+        fileType: docForm.fileType || null,
+        fileUrl: docForm.fileUrl || null,
+        category: docForm.category as "general" | "contract" | "drawing" | "report" | "other",
+      },
+    });
+    await qc.invalidateQueries({ queryKey: getListDocumentsQueryKey({ projectId }) });
+    setUploadDocOpen(false);
+    setDocForm({ fileName: "", category: "general", fileType: "", fileUrl: "" });
   };
 
   return (
@@ -749,7 +869,54 @@ export default function ProjectDetail() {
                         </DialogFooter>
                       </DialogContent>
                     </Dialog>
-                    <Button size="sm"><Plus className="w-4 h-4 mr-2" /> Add Task</Button>
+                    <Dialog open={addTaskOpen} onOpenChange={setAddTaskOpen}>
+                      <DialogTrigger asChild>
+                        <Button size="sm"><Plus className="w-4 h-4 mr-2" /> Add Task</Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>Add Task</DialogTitle>
+                          <DialogDescription>Create a new task for this project.</DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-2">
+                          <div className="space-y-2">
+                            <Label htmlFor="task-title">Title <span className="text-destructive">*</span></Label>
+                            <Input id="task-title" value={taskForm.title} onChange={e => setTaskForm(f => ({ ...f, title: e.target.value }))} placeholder="Task title" />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="task-desc">Description</Label>
+                            <Textarea id="task-desc" value={taskForm.description} onChange={e => setTaskForm(f => ({ ...f, description: e.target.value }))} placeholder="Optional description" rows={3} />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="task-priority">Priority</Label>
+                            <Select value={taskForm.priority} onValueChange={v => setTaskForm(f => ({ ...f, priority: v }))}>
+                              <SelectTrigger id="task-priority"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="low">Low</SelectItem>
+                                <SelectItem value="medium">Medium</SelectItem>
+                                <SelectItem value="high">High</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-2">
+                              <Label htmlFor="task-start">Start Date</Label>
+                              <Input id="task-start" type="date" value={taskForm.startDate} onChange={e => setTaskForm(f => ({ ...f, startDate: e.target.value }))} />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="task-end">End Date</Label>
+                              <Input id="task-end" type="date" value={taskForm.endDate} onChange={e => setTaskForm(f => ({ ...f, endDate: e.target.value }))} />
+                            </div>
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setAddTaskOpen(false)} disabled={createTask.isPending}>Cancel</Button>
+                          <Button onClick={handleCreateTask} disabled={createTask.isPending || !taskForm.title.trim()}>
+                            {createTask.isPending ? "Adding…" : "Add Task"}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
                   </div>
                 </div>
 
@@ -1141,7 +1308,47 @@ export default function ProjectDetail() {
               {/* ── Budget ── */}
               <TabsContent value="budget" className="m-0 space-y-4">
                 <div className="flex justify-end">
-                  <Button size="sm"><Plus className="w-4 h-4 mr-2" /> Add Budget Item</Button>
+                  <Dialog open={addBudgetOpen} onOpenChange={setAddBudgetOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm"><Plus className="w-4 h-4 mr-2" /> Add Budget Item</Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Add Budget Item</DialogTitle>
+                        <DialogDescription>Add a new cost code and budget line to this project.</DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="bi-code">Cost Code <span className="text-destructive">*</span></Label>
+                          <Input id="bi-code" value={budgetForm.costCode} onChange={e => setBudgetForm(f => ({ ...f, costCode: e.target.value }))} placeholder="e.g. CIVIL-01" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="bi-desc">Description <span className="text-destructive">*</span></Label>
+                          <Input id="bi-desc" value={budgetForm.description} onChange={e => setBudgetForm(f => ({ ...f, description: e.target.value }))} placeholder="Budget line description" />
+                        </div>
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="space-y-2">
+                            <Label htmlFor="bi-budgeted">Budgeted (₹) <span className="text-destructive">*</span></Label>
+                            <Input id="bi-budgeted" type="number" min="0" value={budgetForm.budgeted} onChange={e => setBudgetForm(f => ({ ...f, budgeted: e.target.value }))} placeholder="0" />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="bi-committed">Committed (₹)</Label>
+                            <Input id="bi-committed" type="number" min="0" value={budgetForm.committed} onChange={e => setBudgetForm(f => ({ ...f, committed: e.target.value }))} placeholder="0" />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="bi-actual">Actual (₹)</Label>
+                            <Input id="bi-actual" type="number" min="0" value={budgetForm.actual} onChange={e => setBudgetForm(f => ({ ...f, actual: e.target.value }))} placeholder="0" />
+                          </div>
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setAddBudgetOpen(false)} disabled={createBudgetItem.isPending}>Cancel</Button>
+                        <Button onClick={handleCreateBudgetItem} disabled={createBudgetItem.isPending || !budgetForm.costCode.trim() || !budgetForm.description.trim() || !budgetForm.budgeted}>
+                          {createBudgetItem.isPending ? "Adding…" : "Add Item"}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </div>
                 <div className="rounded-md border bg-card">
                   <table className="w-full text-sm text-left">
@@ -1182,7 +1389,41 @@ export default function ProjectDetail() {
               {/* ── RA Bills ── */}
               <TabsContent value="rabills" className="m-0 space-y-4">
                 <div className="flex justify-end">
-                  <Button size="sm"><Plus className="w-4 h-4 mr-2" /> Create RA Bill</Button>
+                  <Dialog open={createBillOpen} onOpenChange={setCreateBillOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm"><Plus className="w-4 h-4 mr-2" /> Create RA Bill</Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Create RA Bill</DialogTitle>
+                        <DialogDescription>Create a new Running Account bill for this project.</DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="ra-num">Bill Number <span className="text-destructive">*</span></Label>
+                          <Input id="ra-num" value={billForm.billNumber} onChange={e => setBillForm(f => ({ ...f, billNumber: e.target.value }))} placeholder="e.g. RA-2026-001" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="ra-amount">Amount (₹) <span className="text-destructive">*</span></Label>
+                          <Input id="ra-amount" type="number" min="0" value={billForm.amount} onChange={e => setBillForm(f => ({ ...f, amount: e.target.value }))} placeholder="0" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="ra-milestone">Milestone</Label>
+                          <Input id="ra-milestone" value={billForm.milestone} onChange={e => setBillForm(f => ({ ...f, milestone: e.target.value }))} placeholder="e.g. Foundation complete" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="ra-desc">Description</Label>
+                          <Textarea id="ra-desc" value={billForm.description} onChange={e => setBillForm(f => ({ ...f, description: e.target.value }))} placeholder="Optional notes" rows={3} />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setCreateBillOpen(false)} disabled={createRaBill.isPending}>Cancel</Button>
+                        <Button onClick={handleCreateRaBill} disabled={createRaBill.isPending || !billForm.billNumber.trim() || !billForm.amount}>
+                          {createRaBill.isPending ? "Creating…" : "Create Bill"}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </div>
                 <div className="grid gap-4">
                   {projectRaBills.map(bill => (
@@ -1285,7 +1526,58 @@ export default function ProjectDetail() {
               {/* ── Stakeholders ── */}
               <TabsContent value="stakeholders" className="m-0 space-y-4">
                 <div className="flex justify-end">
-                  <Button size="sm"><Plus className="w-4 h-4 mr-2" /> Add Stakeholder</Button>
+                  <Dialog open={addStakeholderOpen} onOpenChange={setAddStakeholderOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm"><Plus className="w-4 h-4 mr-2" /> Add Stakeholder</Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Add Stakeholder</DialogTitle>
+                        <DialogDescription>Add a new stakeholder contact to this project.</DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="nsh-name">Name <span className="text-destructive">*</span></Label>
+                          <Input id="nsh-name" value={newShForm.name} onChange={e => setNewShForm(f => ({ ...f, name: e.target.value }))} placeholder="Full name" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="nsh-role">Role / Title</Label>
+                          <Input id="nsh-role" value={newShForm.role} onChange={e => setNewShForm(f => ({ ...f, role: e.target.value }))} placeholder="e.g. Site Engineer, Client" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="nsh-org">Organisation</Label>
+                          <Input id="nsh-org" value={newShForm.organization} onChange={e => setNewShForm(f => ({ ...f, organization: e.target.value }))} placeholder="Company or firm" />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-2">
+                            <Label htmlFor="nsh-email">Email</Label>
+                            <Input id="nsh-email" type="email" value={newShForm.email} onChange={e => setNewShForm(f => ({ ...f, email: e.target.value }))} placeholder="email@example.com" />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="nsh-phone">Phone</Label>
+                            <Input id="nsh-phone" value={newShForm.phone} onChange={e => setNewShForm(f => ({ ...f, phone: e.target.value }))} placeholder="+91 ..." />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="nsh-access">Access Level</Label>
+                          <Select value={newShForm.accessLevel} onValueChange={v => setNewShForm(f => ({ ...f, accessLevel: v }))}>
+                            <SelectTrigger id="nsh-access"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="read">Read — view only</SelectItem>
+                              <SelectItem value="write">Write — can update</SelectItem>
+                              <SelectItem value="admin">Admin — full access</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setAddStakeholderOpen(false)} disabled={createStakeholder.isPending}>Cancel</Button>
+                        <Button onClick={handleCreateStakeholder} disabled={createStakeholder.isPending || !newShForm.name.trim()}>
+                          {createStakeholder.isPending ? "Adding…" : "Add Stakeholder"}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   {projectStakeholders.map(sh => (
@@ -1378,7 +1670,50 @@ export default function ProjectDetail() {
               {/* ── Documents ── */}
               <TabsContent value="documents" className="m-0 space-y-4">
                 <div className="flex justify-end">
-                  <Button size="sm"><Plus className="w-4 h-4 mr-2" /> Upload Document</Button>
+                  <Dialog open={uploadDocOpen} onOpenChange={setUploadDocOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm"><Plus className="w-4 h-4 mr-2" /> Upload Document</Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Upload Document</DialogTitle>
+                        <DialogDescription>Register a document or paste a link for this project.</DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="doc-name">File Name <span className="text-destructive">*</span></Label>
+                          <Input id="doc-name" value={docForm.fileName} onChange={e => setDocForm(f => ({ ...f, fileName: e.target.value }))} placeholder="e.g. Structural Drawing v3.pdf" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="doc-cat">Category</Label>
+                          <Select value={docForm.category} onValueChange={v => setDocForm(f => ({ ...f, category: v }))}>
+                            <SelectTrigger id="doc-cat"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="general">General</SelectItem>
+                              <SelectItem value="drawing">Drawing</SelectItem>
+                              <SelectItem value="contract">Contract</SelectItem>
+                              <SelectItem value="report">Report</SelectItem>
+                              <SelectItem value="other">Other</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="doc-type">File Type</Label>
+                          <Input id="doc-type" value={docForm.fileType} onChange={e => setDocForm(f => ({ ...f, fileType: e.target.value }))} placeholder="e.g. PDF, DWG, DOCX" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="doc-url">File URL (optional)</Label>
+                          <Input id="doc-url" value={docForm.fileUrl} onChange={e => setDocForm(f => ({ ...f, fileUrl: e.target.value }))} placeholder="https://..." />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setUploadDocOpen(false)} disabled={createDocument.isPending}>Cancel</Button>
+                        <Button onClick={handleCreateDocument} disabled={createDocument.isPending || !docForm.fileName.trim()}>
+                          {createDocument.isPending ? "Saving…" : "Save Document"}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </div>
                 <div className="rounded-md border bg-card">
                   <table className="w-full text-sm text-left">
@@ -1396,7 +1731,11 @@ export default function ProjectDetail() {
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
                               <FileText className="h-4 w-4 text-primary" />
-                              <span className="font-medium text-primary hover:underline cursor-pointer">{doc.fileName}</span>
+                              <span
+                                className="font-medium text-primary hover:underline cursor-pointer"
+                                onClick={() => doc.fileUrl && window.open(doc.fileUrl, "_blank")}
+                                title={doc.fileUrl ? "Open document" : "No URL — edit to add a link"}
+                              >{doc.fileName}</span>
                             </div>
                           </td>
                           <td className="px-4 py-3"><Badge variant="outline">{doc.category}</Badge></td>

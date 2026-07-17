@@ -73,7 +73,7 @@ function StatusSelect({ task }: { task: Task }) {
       value={task.status}
       disabled={isPending}
       onValueChange={(val) =>
-        mutate({ id: task.id, data: { status: val as Task["status"] } })
+        mutate({ id: task.id, data: { status: val as Task["status"] } as any })
       }
     >
       <SelectTrigger
