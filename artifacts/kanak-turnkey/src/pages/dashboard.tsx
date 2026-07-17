@@ -10,12 +10,21 @@ import {
   ResponsiveContainer,
   PieChart,
   Pie,
-  Cell
+  Cell,
+  Legend
 } from "recharts";
 import { Briefcase, Building2, CheckSquare, Users } from "lucide-react";
 import { format } from "date-fns";
 
-const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
+const COLORS = ['#f97316', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'];
+
+const STATUS_LABELS: Record<string, string> = {
+  planning: 'Planning',
+  in_progress: 'In Progress',
+  on_hold: 'On Hold',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+};
 
 export default function Dashboard() {
   const { data: summary, isLoading: isLoadingSummary } = useGetDashboardSummary();
@@ -117,24 +126,32 @@ export default function Dashboard() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={summary.projectsByStatus}
+                    data={summary.projectsByStatus.map(d => ({
+                      ...d,
+                      name: STATUS_LABELS[d.status] ?? d.status,
+                    }))}
                     cx="50%"
-                    cy="50%"
+                    cy="45%"
                     innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={2}
+                    outerRadius={95}
+                    paddingAngle={3}
                     dataKey="count"
-                    nameKey="status"
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    labelLine={false}
+                    nameKey="name"
+                    isAnimationActive={false}
                   >
-                    {summary.projectsByStatus.map((entry, index) => (
+                    {summary.projectsByStatus.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))' }}
-                    itemStyle={{ color: 'hsl(var(--foreground))' }}
+                  <Tooltip
+                    formatter={(value, name) => [value, name]}
+                    contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: 8 }}
+                    itemStyle={{ color: '#f1f5f9' }}
+                  />
+                  <Legend
+                    iconType="circle"
+                    iconSize={10}
+                    formatter={(value) => <span style={{ color: '#94a3b8', fontSize: 12 }}>{value}</span>}
                   />
                 </PieChart>
               </ResponsiveContainer>
