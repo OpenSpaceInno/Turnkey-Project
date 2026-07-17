@@ -2139,6 +2139,10 @@ export type ListCommunicationsParams = {
   projectId?: number;
 };
 
+export interface NotificationPreferences {
+  preferences: Record<string, boolean>;
+}
+
 export interface CompanySettings {
   id: number;
   companyName: string;

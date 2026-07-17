@@ -472,6 +472,13 @@ export const taskTemplateItemsTable = pgTable("task_template_items", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const notificationPreferencesTable = pgTable("notification_preferences", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().unique(),
+  preferences: jsonb("preferences").notNull().default({}),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const companySettingsTable = pgTable("company_settings", {
   id: serial("id").primaryKey(),
   companyName: varchar("company_name", { length: 255 }).notNull().default(""),

@@ -6,6 +6,7 @@ import {
   auditLogsTable,
   usersTable,
   companySettingsTable,
+  notificationPreferencesTable,
 } from "@workspace/db";
 import { getCurrentUser } from "../lib/session";
 
@@ -42,6 +43,47 @@ router.post("/notifications/clear", async (_req, res): Promise<void> => {
     .set({ isRead: true })
     .where(eq(notificationsTable.userId, me.id));
   res.sendStatus(204);
+});
+
+// Notification Preferences — per-user, per-type toggles
+router.get("/notifications/preferences", async (_req, res): Promise<void> => {
+  const me = await getCurrentUser();
+  let [row] = await db
+    .select()
+    .from(notificationPreferencesTable)
+    .where(eq(notificationPreferencesTable.userId, me.id))
+    .limit(1);
+  if (!row) {
+    [row] = await db
+      .insert(notificationPreferencesTable)
+      .values({ userId: me.id, preferences: {} })
+      .returning();
+  }
+  res.json({ preferences: row.preferences as Record<string, boolean> });
+});
+
+router.patch("/notifications/preferences", async (req, res): Promise<void> => {
+  const me = await getCurrentUser();
+  const prefs = (req.body ?? {}).preferences ?? {};
+  const [existing] = await db
+    .select({ id: notificationPreferencesTable.id })
+    .from(notificationPreferencesTable)
+    .where(eq(notificationPreferencesTable.userId, me.id))
+    .limit(1);
+  if (!existing) {
+    const [row] = await db
+      .insert(notificationPreferencesTable)
+      .values({ userId: me.id, preferences: prefs })
+      .returning();
+    res.json({ preferences: row.preferences as Record<string, boolean> });
+    return;
+  }
+  const [row] = await db
+    .update(notificationPreferencesTable)
+    .set({ preferences: prefs, updatedAt: new Date() })
+    .where(eq(notificationPreferencesTable.userId, me.id))
+    .returning();
+  res.json({ preferences: row.preferences as Record<string, boolean> });
 });
 
 // Company Settings — singleton row (id = 1)
