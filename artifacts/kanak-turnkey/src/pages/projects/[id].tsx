@@ -19,9 +19,11 @@ import {
   useApplyTaskTemplate,
   useUpdateRaBill,
   useUpdateStakeholder,
+  useUpdateTask,
   type RaBill,
   type Stakeholder,
   type PunchListItem,
+  type Task,
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -74,6 +76,48 @@ const PL_PRIORITY: Record<string, "destructive" | "secondary" | "outline"> = {
 const PL_CATEGORIES = ["civil", "mechanical", "electrical", "finishing", "safety", "general"] as const;
 
 const INR = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
+
+const TASK_STATUS_OPTIONS = [
+  { value: "todo",        label: "Todo",        dot: "bg-muted-foreground" },
+  { value: "in_progress", label: "In Progress", dot: "bg-amber-500" },
+  { value: "in_review",   label: "In Review",   dot: "bg-sky-500" },
+  { value: "completed",   label: "Completed",   dot: "bg-emerald-600" },
+] as const;
+
+function TaskStatusSelect({ task, projectId }: { task: Task; projectId: number }) {
+  const qc = useQueryClient();
+  const { mutate, isPending } = useUpdateTask({
+    mutation: {
+      onSuccess: () => qc.invalidateQueries({ queryKey: getListTasksQueryKey({ projectId }) }),
+    },
+  });
+  const dot = TASK_STATUS_OPTIONS.find(o => o.value === task.status)?.dot ?? "bg-muted-foreground";
+  return (
+    <Select
+      value={task.status}
+      disabled={isPending}
+      onValueChange={(val) => mutate({ id: task.id, data: { status: val as Task["status"] } })}
+    >
+      <SelectTrigger
+        className="h-7 text-xs px-2 gap-1 w-[120px]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${dot}`} />
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent onClick={(e) => e.stopPropagation()}>
+        {TASK_STATUS_OPTIONS.map((s) => (
+          <SelectItem key={s.value} value={s.value} className="text-xs">
+            <span className="flex items-center gap-2">
+              <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
+              {s.label}
+            </span>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
 
 export default function ProjectDetail() {
   const { id } = useParams();
@@ -596,7 +640,7 @@ export default function ProjectDetail() {
                                           {t.startDate ? format(new Date(t.startDate), "MMM d") : "—"} → {t.endDate ? format(new Date(t.endDate), "MMM d, yyyy") : "—"}
                                         </div>
                                       </div>
-                                      <Badge variant="outline" className="text-[10px] capitalize">{t.status.replace("_", " ")}</Badge>
+                                      <TaskStatusSelect task={t} projectId={projectId} />
                                     </div>
                                   );
                                 })}
@@ -719,20 +763,27 @@ export default function ProjectDetail() {
                     </Button>
                   </div>
                 ) : (
-                  <div className="grid gap-4 md:grid-cols-3">
-                    {["todo", "in_progress", "completed"].map(status => {
+                  <div className="grid gap-4 md:grid-cols-4">
+                    {TASK_STATUS_OPTIONS.map(({ value: status, label, dot }) => {
                       const st = projectTasks.filter(t => t.status === status);
                       return (
                         <div key={status} className="bg-muted/50 p-4 rounded-lg space-y-3">
-                          <h3 className="font-semibold text-sm capitalize flex items-center justify-between">
-                            {status.replace("_", " ")} <Badge variant="secondary">{st.length}</Badge>
+                          <h3 className="font-semibold text-sm flex items-center justify-between">
+                            <span className="flex items-center gap-1.5">
+                              <span className={`h-2 w-2 rounded-full ${dot}`} />
+                              {label}
+                            </span>
+                            <Badge variant="secondary">{st.length}</Badge>
                           </h3>
                           {st.map(task => (
-                            <Card key={task.id} className="p-3 shadow-sm hover:border-primary/50 cursor-pointer transition-colors">
+                            <Card key={task.id} className="p-3 shadow-sm hover:border-primary/50 transition-colors">
                               <div className="font-medium text-sm mb-1">{task.title}</div>
                               <div className="flex justify-between items-center text-xs text-muted-foreground mt-2">
                                 <span>{task.assignedToName || "Unassigned"}</span>
                                 <Badge variant="outline" className="text-[10px] h-4">{task.priority}</Badge>
+                              </div>
+                              <div className="mt-2">
+                                <TaskStatusSelect task={task} projectId={projectId} />
                               </div>
                             </Card>
                           ))}
