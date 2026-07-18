@@ -13,6 +13,7 @@ import type { User } from "./generated/api.schemas";
 export interface CreateUserInput {
   name: string;
   email: string;
+  password: string;
   roles?: string[];
   avatarUrl?: string;
 }

@@ -131,12 +131,18 @@ function CreateUserDialog({
   const { mutate, isPending } = useCreateUser();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [selectedRoles, setSelectedRoles] = useState<string[]>(["viewer"]);
   const [error, setError] = useState("");
 
   function reset() {
     setName("");
     setEmail("");
+    setPassword("");
+    setConfirmPassword("");
+    setShowPassword(false);
     setSelectedRoles(["viewer"]);
     setError("");
   }
@@ -147,16 +153,37 @@ function CreateUserDialog({
     );
   }
 
+  const passwordStrength = useMemo(() => {
+    if (!password) return null;
+    if (password.length < 6) return { level: "weak", label: "Too short", color: "text-red-500" };
+    if (password.length < 8) return { level: "fair", label: "Fair", color: "text-yellow-500" };
+    const hasUpper = /[A-Z]/.test(password);
+    const hasNum = /[0-9]/.test(password);
+    const hasSpecial = /[^a-zA-Z0-9]/.test(password);
+    const score = [hasUpper, hasNum, hasSpecial].filter(Boolean).length;
+    if (score === 3) return { level: "strong", label: "Strong", color: "text-green-600" };
+    if (score >= 1) return { level: "good", label: "Good", color: "text-emerald-500" };
+    return { level: "fair", label: "Fair", color: "text-yellow-500" };
+  }, [password]);
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim() || !email.trim()) return;
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
     if (selectedRoles.length === 0) {
       setError("Assign at least one role.");
       return;
     }
     setError("");
     mutate(
-      { name: name.trim(), email: email.trim(), roles: selectedRoles },
+      { name: name.trim(), email: email.trim(), password, roles: selectedRoles },
       {
         onSuccess: () => {
           reset();
@@ -169,6 +196,9 @@ function CreateUserDialog({
     );
   }
 
+  const canSubmit =
+    name.trim() && email.trim() && password.length >= 6 && password === confirmPassword && selectedRoles.length > 0;
+
   return (
     <Dialog
       open={open}
@@ -177,67 +207,166 @@ function CreateUserDialog({
         onOpenChange(v);
       }}
     >
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Invite New User</DialogTitle>
+          <DialogTitle>Create New User</DialogTitle>
           <DialogDescription>
-            Create an account and assign roles. The user can log in immediately.
+            Set up credentials and assign roles. The user can log in immediately with these details.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="cu-name">
-              Full Name <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="cu-name"
-              placeholder="Rahul Sharma"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
+        <form onSubmit={handleSubmit} className="space-y-5">
+
+          {/* ── Profile ── */}
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Profile</p>
+            <div className="space-y-1.5">
+              <Label htmlFor="cu-name">
+                Full Name <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="cu-name"
+                placeholder="e.g. Rahul Sharma"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="cu-email">
+                Email Address <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="cu-email"
+                type="email"
+                placeholder="rahul@kanakturnkey.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="cu-email">
-              Email Address <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="cu-email"
-              type="email"
-              placeholder="rahul@kanakturnkey.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
+
+          {/* ── Password ── */}
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Password</p>
+            <div className="space-y-1.5">
+              <Label htmlFor="cu-password">
+                Password <span className="text-destructive">*</span>
+              </Label>
+              <div className="relative">
+                <Input
+                  id="cu-password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Min. 6 characters"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  )}
+                </button>
+              </div>
+              {/* Strength indicator */}
+              {password && passwordStrength && (
+                <div className="space-y-1">
+                  <div className="flex gap-1 h-1">
+                    {["weak", "fair", "good", "strong"].map((lvl, i) => (
+                      <div
+                        key={lvl}
+                        className={`flex-1 rounded-full transition-colors ${
+                          ["weak", "fair", "good", "strong"].indexOf(passwordStrength.level) >= i
+                            ? passwordStrength.level === "weak" ? "bg-red-400"
+                              : passwordStrength.level === "fair" ? "bg-yellow-400"
+                              : passwordStrength.level === "good" ? "bg-emerald-400"
+                              : "bg-green-500"
+                            : "bg-muted"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <p className={`text-xs font-medium ${passwordStrength.color}`}>
+                    {passwordStrength.label}
+                  </p>
+                </div>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="cu-confirm">
+                Confirm Password <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="cu-confirm"
+                type={showPassword ? "text" : "password"}
+                placeholder="Re-enter password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                className={
+                  confirmPassword && confirmPassword !== password
+                    ? "border-destructive focus-visible:ring-destructive"
+                    : confirmPassword && confirmPassword === password
+                    ? "border-green-500 focus-visible:ring-green-500"
+                    : ""
+                }
+              />
+              {confirmPassword && confirmPassword !== password && (
+                <p className="text-xs text-destructive">Passwords do not match.</p>
+              )}
+              {confirmPassword && confirmPassword === password && (
+                <p className="text-xs text-green-600">✓ Passwords match</p>
+              )}
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label>
-              Roles <span className="text-destructive">*</span>
-            </Label>
+
+          {/* ── Roles ── */}
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Assign Roles <span className="text-destructive">*</span>
+            </p>
             <div className="grid grid-cols-2 gap-2">
               {ALL_ROLES.map((role) => (
                 <label
                   key={role.value}
-                  className="flex items-center gap-2 cursor-pointer rounded-md border px-3 py-2 hover:bg-accent/50 transition-colors"
+                  className={`flex items-center gap-2 cursor-pointer rounded-md border px-3 py-2 transition-colors ${
+                    selectedRoles.includes(role.value)
+                      ? "border-primary/50 bg-primary/5"
+                      : "hover:bg-accent/50"
+                  }`}
                 >
                   <Checkbox
                     checked={selectedRoles.includes(role.value)}
                     onCheckedChange={() => toggleRole(role.value)}
                   />
-                  <span className="text-sm">{role.label}</span>
+                  <div>
+                    <p className="text-sm font-medium leading-tight">{role.label}</p>
+                  </div>
                 </label>
               ))}
             </div>
           </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
+
+          {error && (
+            <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              {error}
+            </div>
+          )}
+
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button
-              type="submit"
-              disabled={isPending || !name.trim() || !email.trim()}
-            >
+            <Button type="submit" disabled={isPending || !canSubmit}>
               {isPending ? "Creating…" : "Create User"}
             </Button>
           </DialogFooter>
@@ -554,7 +683,7 @@ export default function Admin() {
         </div>
         <Button onClick={() => setCreateOpen(true)} className="gap-2 shrink-0">
           <UserPlus className="h-4 w-4" />
-          Invite User
+          Create User
         </Button>
       </div>
 

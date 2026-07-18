@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import bcrypt from "bcryptjs";
 import { getCurrentUser, setActiveRole, clearUserCache } from "../lib/session";
 
 const VALID_ROLES = [
@@ -69,16 +70,22 @@ router.patch("/users/:id/roles", async (req, res): Promise<void> => {
   });
 });
 
-// POST /users — create a new user
+// POST /users — create a new user with password
 router.post("/users", async (req, res): Promise<void> => {
-  const { name, email, roles, avatarUrl } = req.body ?? {};
+  const { name, email, password, roles, avatarUrl } = req.body ?? {};
   if (!name || !email) {
     res.status(400).json({ error: "name and email are required" });
+    return;
+  }
+  if (!password || password.toString().length < 6) {
+    res.status(400).json({ error: "password must be at least 6 characters" });
     return;
   }
   const sanitisedRoles: string[] = Array.isArray(roles)
     ? roles.filter((r: string) => VALID_ROLES.includes(r as typeof VALID_ROLES[number]))
     : ["viewer"];
+
+  const passwordHash = await bcrypt.hash(password.toString(), 10);
 
   try {
     const [user] = await db
@@ -86,6 +93,7 @@ router.post("/users", async (req, res): Promise<void> => {
       .values({
         name: name.toString(),
         email: email.toString(),
+        passwordHash,
         roles: sanitisedRoles,
         avatarUrl: avatarUrl ? avatarUrl.toString() : null,
         activeRole: sanitisedRoles[0] ?? "viewer",

@@ -26,6 +26,7 @@ export const usersTable = pgTable("users", {
   id: serial("id").primaryKey(),
   email: varchar("email", { length: 255 }).notNull().unique(),
   name: varchar("name", { length: 255 }).notNull(),
+  passwordHash: text("password_hash"),
   avatarUrl: text("avatar_url"),
   roles: text("roles").array().notNull().default([]),
   activeRole: varchar("active_role", { length: 50 }).notNull().default("admin"),
