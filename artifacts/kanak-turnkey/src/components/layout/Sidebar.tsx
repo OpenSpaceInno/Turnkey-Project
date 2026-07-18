@@ -2,6 +2,7 @@ import { Link, useLocation } from "wouter";
 import { 
   LayoutDashboard, 
   Users, 
+  UserCog,
   Briefcase, 
   CheckSquare, 
   DollarSign, 
@@ -37,10 +38,8 @@ export function Sidebar() {
   const secondaryNavigation = [
     { name: "Notifications", href: "/notifications", icon: Bell },
     { name: "Settings", href: "/settings", icon: Settings },
-    ...(user?.activeRole === "admin" ? [
-      { name: "Audit Logs", href: "/audit-logs", icon: ShieldAlert },
-      { name: "Admin", href: "/admin", icon: Users },
-    ] : []),
+    { name: "Audit Logs", href: "/audit-logs", icon: ShieldAlert },
+    { name: "User Management", href: "/admin", icon: UserCog },
   ];
 
   return (
