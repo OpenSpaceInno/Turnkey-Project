@@ -1,5 +1,6 @@
 export type CustomFetchOptions = RequestInit & {
   responseType?: "json" | "text" | "blob" | "auto";
+  params?: Record<string, any>;
 };
 
 export type ErrorType<T = unknown> = ApiError<T>;
@@ -327,7 +328,20 @@ export async function customFetch<T = unknown>(
   options: CustomFetchOptions = {},
 ): Promise<T> {
   input = applyBaseUrl(input);
-  const { responseType = "auto", headers: headersInit, ...init } = options;
+  const { responseType = "auto", headers: headersInit, params, ...init } = options;
+
+  if (params && typeof input === "string") {
+    const searchParams = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== null && v !== "") {
+        searchParams.append(k, String(v));
+      }
+    }
+    const q = searchParams.toString();
+    if (q) {
+      input = input.includes("?") ? `${input}&${q}` : `${input}?${q}`;
+    }
+  }
 
   const method = resolveMethod(input, init.method);
 
@@ -360,7 +374,13 @@ export async function customFetch<T = unknown>(
 
   const requestInfo = { method, url: resolveUrl(input) };
 
-  const response = await fetch(input, { ...init, method, headers });
+  // Always include credentials (cookies) with requests
+  const response = await fetch(input, { 
+    ...init, 
+    method, 
+    headers,
+    credentials: init.credentials || 'include'
+  });
 
   if (!response.ok) {
     const errorData = await parseErrorBody(response, method);

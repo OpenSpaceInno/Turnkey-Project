@@ -643,8 +643,10 @@ export default function Admin() {
   // Stats
   const roleCount = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const user of users) {
-      for (const r of user.roles) {
+    const usersArray = Array.isArray(users) ? users : [];
+    for (const user of usersArray) {
+      const rolesArray = Array.isArray(user.roles) ? user.roles : [];
+      for (const r of rolesArray) {
         counts[r] = (counts[r] ?? 0) + 1;
       }
     }
@@ -652,14 +654,18 @@ export default function Admin() {
   }, [users]);
 
   const filtered = useMemo(() => {
+    const usersArray = Array.isArray(users) ? users : [];
     const q = search.toLowerCase();
-    if (!q) return users;
-    return users.filter(
-      (u) =>
-        u.name.toLowerCase().includes(q) ||
-        u.email.toLowerCase().includes(q) ||
-        u.roles.some((r) => r.toLowerCase().includes(q))
+    if (!q) return usersArray;
+    const result = usersArray.filter(
+      (u) => {
+        const rolesArray = Array.isArray(u.roles) ? u.roles : [];
+        return u.name?.toLowerCase().includes(q) ||
+          u.email?.toLowerCase().includes(q) ||
+          rolesArray.some((r) => r?.toLowerCase().includes(q));
+      }
     );
+    return Array.isArray(result) ? result : [];
   }, [users, search]);
 
   if (isLoading) {
@@ -761,7 +767,7 @@ export default function Admin() {
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((user) => (
+                  (Array.isArray(filtered) ? filtered : []).map((user) => (
                     <tr key={user.id} className="hover:bg-accent/30 transition-colors">
                       {/* User */}
                       <td className="px-4 py-3">

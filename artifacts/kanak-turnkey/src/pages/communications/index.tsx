@@ -38,7 +38,7 @@ export default function Communications() {
       </div>
 
       <div className="space-y-4">
-        {communications?.map((comm) => (
+        {(Array.isArray(communications) ? communications : []).map((comm) => (
           <Card key={comm.id}>
             <CardContent className="p-4 flex gap-4">
               <div className="mt-1 flex items-center justify-center h-8 w-8 rounded-full bg-muted shrink-0 text-muted-foreground">
@@ -60,7 +60,7 @@ export default function Communications() {
             </CardContent>
           </Card>
         ))}
-        {!communications?.length && !isLoading && (
+        {!(Array.isArray(communications) ? communications : []).length && !isLoading && (
           <div className="text-center p-8 border rounded-md border-dashed text-muted-foreground">
             No communications logged yet.
           </div>

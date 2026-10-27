@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc , sql} from "drizzle-orm";
 import {
   db,
   vendorsTable,
@@ -7,6 +7,7 @@ import {
   rfqsTable,
   quotationsTable,
   purchaseOrdersTable,
+  procurementPurchaseOrdersTable,
   materialsTable,
   projectsTable,
   usersTable,
@@ -37,7 +38,7 @@ router.get("/vendors", async (_req, res): Promise<void> => {
 
 router.post("/vendors", async (req, res): Promise<void> => {
   const b = req.body ?? {};
-  const [v] = await db
+  await db
     .insert(vendorsTable)
     .values({
       name: b.name,
@@ -48,8 +49,15 @@ router.post("/vendors", async (req, res): Promise<void> => {
       category: b.category ?? null,
       rating: b.rating != null ? String(b.rating) : "0",
       status: b.status ?? "active",
-    })
-    .returning();
+    });
+  
+  // MySQL doesn't support .returning() - query after insert
+  const [v] = await db
+    .select()
+    .from(vendorsTable)
+    .orderBy(desc(vendorsTable.id))
+    .limit(1);
+  
   res.status(201).json(fVendor(v!));
 });
 
@@ -69,16 +77,23 @@ router.patch("/vendors/:id", async (req, res): Promise<void> => {
     if (b[k] !== undefined) update[k] = b[k];
   }
   if (b.rating !== undefined) update.rating = String(b.rating);
-  const [v] = await db
+  await db
     .update(vendorsTable)
     .set(update)
+    .where(eq(vendorsTable.id, id));
+  
+  // MySQL doesn't support .returning() - query after update
+  const [updated] = await db
+    .select()
+    .from(vendorsTable)
     .where(eq(vendorsTable.id, id))
-    .returning();
-  if (!v) {
+    .limit(1);
+  
+  if (!updated) {
     res.status(404).json({ error: "Not found" });
     return;
   }
-  res.json(fVendor(v));
+  res.json(fVendor(updated));
 });
 
 // Material Requests
@@ -101,7 +116,7 @@ router.get("/material-requests", async (_req, res): Promise<void> => {
 router.post("/material-requests", async (req, res): Promise<void> => {
   const b = req.body ?? {};
   const me = await getCurrentUser();
-  const [m] = await db
+  await db
     .insert(materialRequestsTable)
     .values({
       projectId: b.projectId,
@@ -110,8 +125,15 @@ router.post("/material-requests", async (req, res): Promise<void> => {
       quantity: String(b.quantity),
       unit: b.unit,
       createdById: me.id,
-    })
-    .returning();
+    });
+  
+  // MySQL doesn't support .returning() - query after insert
+  const [m] = await db
+    .select()
+    .from(materialRequestsTable)
+    .orderBy(desc(materialRequestsTable.id))
+    .limit(1);
+  
   res.status(201).json(fMatReq(m!));
 });
 
@@ -119,16 +141,23 @@ router.patch("/material-requests/:id", async (req, res): Promise<void> => {
   const id = parseInt(req.params.id as string, 10);
   const update: Record<string, unknown> = {};
   if (req.body?.status !== undefined) update.status = req.body.status;
-  const [m] = await db
+  await db
     .update(materialRequestsTable)
     .set(update)
+    .where(eq(materialRequestsTable.id, id));
+  
+  // MySQL doesn't support .returning() - query after update
+  const [updated] = await db
+    .select()
+    .from(materialRequestsTable)
     .where(eq(materialRequestsTable.id, id))
-    .returning();
-  if (!m) {
+    .limit(1);
+  
+  if (!updated) {
     res.status(404).json({ error: "Not found" });
     return;
   }
-  res.json(fMatReq(m));
+  res.json(fMatReq(updated));
 });
 
 // RFQs
@@ -144,7 +173,7 @@ router.get("/rfqs", async (_req, res): Promise<void> => {
 router.post("/rfqs", async (req, res): Promise<void> => {
   const b = req.body ?? {};
   const me = await getCurrentUser();
-  const [r] = await db
+  const result = await db
     .insert(rfqsTable)
     .values({
       projectId: b.projectId,
@@ -152,8 +181,16 @@ router.post("/rfqs", async (req, res): Promise<void> => {
       title: b.title,
       description: b.description ?? null,
       createdById: me.id,
-    })
-    .returning();
+    });
+  
+  // MySQL returns insertId - use it to fetch the created record
+  const insertId = Number(result[0].insertId);
+  const [r] = await db
+    .select()
+    .from(rfqsTable)
+    .where(eq(rfqsTable.id, insertId))
+    .limit(1);
+  
   res.status(201).json(r);
 });
 
@@ -187,11 +224,18 @@ router.patch("/rfqs/:id", async (req, res): Promise<void> => {
   for (const k of ["status", "title", "description"]) {
     if (b[k] !== undefined) update[k] = b[k];
   }
-  const [r] = await db
+  await db
     .update(rfqsTable)
     .set(update)
+    .where(eq(rfqsTable.id, id));
+  
+  // MySQL doesn't support .returning() - query after update
+  const [r] = await db
+    .select()
+    .from(rfqsTable)
     .where(eq(rfqsTable.id, id))
-    .returning();
+    .limit(1);
+  
   if (!r) {
     res.status(404).json({ error: "Not found" });
     return;
@@ -202,7 +246,7 @@ router.patch("/rfqs/:id", async (req, res): Promise<void> => {
 router.post("/rfqs/:rfqId/quotations", async (req, res): Promise<void> => {
   const rfqId = parseInt(req.params.rfqId as string, 10);
   const b = req.body ?? {};
-  const [q] = await db
+  const result = await db
     .insert(quotationsTable)
     .values({
       rfqId,
@@ -210,8 +254,16 @@ router.post("/rfqs/:rfqId/quotations", async (req, res): Promise<void> => {
       amount: String(b.amount),
       deliveryDays: b.deliveryDays,
       notes: b.notes ?? null,
-    })
-    .returning();
+    });
+  
+  // MySQL returns insertId - use it to fetch the created record
+  const insertId = Number(result[0].insertId);
+  const [q] = await db
+    .select()
+    .from(quotationsTable)
+    .where(eq(quotationsTable.id, insertId))
+    .limit(1);
+  
   await db
     .update(rfqsTable)
     .set({ status: "quotes_received" })
@@ -233,15 +285,24 @@ router.post("/quotations/:id/select", async (req, res): Promise<void> => {
     .update(quotationsTable)
     .set({ isSelected: false })
     .where(eq(quotationsTable.rfqId, q.rfqId));
-  const [updated] = await db
+  
+  await db
     .update(quotationsTable)
     .set({ isSelected: true })
+    .where(eq(quotationsTable.id, id));
+  
+  // MySQL doesn't support .returning() - query after update
+  const [updated] = await db
+    .select()
+    .from(quotationsTable)
     .where(eq(quotationsTable.id, id))
-    .returning();
+    .limit(1);
+  
   await db
     .update(rfqsTable)
     .set({ status: "awarded" })
     .where(eq(rfqsTable.id, q.rfqId));
+  
   res.json(fQuote(updated!));
 });
 
@@ -257,9 +318,42 @@ router.get("/purchase-orders", async (_req, res): Promise<void> => {
     .leftJoin(projectsTable, eq(projectsTable.id, purchaseOrdersTable.projectId))
     .leftJoin(vendorsTable, eq(vendorsTable.id, purchaseOrdersTable.vendorId))
     .orderBy(desc(purchaseOrdersTable.createdAt));
-  res.json(
-    rows.map((r) => ({ ...fPo(r.po), projectName: r.p, vendorName: r.vn })),
-  );
+
+  const procRows = await db
+    .select({
+      po: procurementPurchaseOrdersTable,
+      p: projectsTable.name,
+      vn: vendorsTable.name,
+    })
+    .from(procurementPurchaseOrdersTable)
+    .leftJoin(projectsTable, eq(projectsTable.id, procurementPurchaseOrdersTable.projectId))
+    .leftJoin(vendorsTable, eq(vendorsTable.id, procurementPurchaseOrdersTable.vendorId))
+    .orderBy(desc(procurementPurchaseOrdersTable.createdAt));
+
+  const poNumbers = new Set(rows.map((r) => r.po.poNumber));
+  const combined = [
+    ...rows.map((r) => ({ ...fPo(r.po), projectName: r.p, vendorName: r.vn })),
+    ...procRows
+      .filter((r) => !poNumbers.has(r.po.poNumber))
+      .map((r) => ({
+        id: r.po.id,
+        projectId: r.po.projectId,
+        vendorId: r.po.vendorId,
+        poNumber: r.po.poNumber,
+        description: r.po.notes || `PO ${r.po.poNumber}`,
+        totalAmount: Number(r.po.totalAmount),
+        deliveryDate: r.po.expectedDeliveryDate,
+        status: r.po.status,
+        inspectionStatus: r.po.status === "completed" || r.po.status === "inspected" ? "passed" : "pending",
+        createdById: r.po.createdById,
+        createdAt: r.po.createdAt,
+        updatedAt: r.po.updatedAt,
+        projectName: r.p,
+        vendorName: r.vn,
+      })),
+  ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  res.json(combined);
 });
 
 router.post("/purchase-orders", async (req, res): Promise<void> => {
@@ -267,7 +361,7 @@ router.post("/purchase-orders", async (req, res): Promise<void> => {
   const me = await getCurrentUser();
   const poNumber =
     b.poNumber || (await generateNumber("PO", purchaseOrdersTable));
-  const [po] = await db
+  await db
     .insert(purchaseOrdersTable)
     .values({
       projectId: b.projectId,
@@ -278,8 +372,15 @@ router.post("/purchase-orders", async (req, res): Promise<void> => {
       deliveryDate: b.deliveryDate ?? null,
       status: b.status ?? "draft",
       createdById: me.id,
-    })
-    .returning();
+    });
+  
+  // MySQL doesn't support .returning() - query after insert
+  const [po] = await db
+    .select()
+    .from(purchaseOrdersTable)
+    .orderBy(desc(purchaseOrdersTable.id))
+    .limit(1);
+  
   res.status(201).json(fPo(po!));
 });
 
@@ -290,16 +391,30 @@ router.patch("/purchase-orders/:id", async (req, res): Promise<void> => {
   if (b.status !== undefined) update.status = b.status;
   if (b.inspectionStatus !== undefined)
     update.inspectionStatus = b.inspectionStatus;
-  const [po] = await db
+  await db
     .update(purchaseOrdersTable)
     .set(update)
+    .where(eq(purchaseOrdersTable.id, id));
+  
+  // MySQL doesn't support .returning() - query after update
+  const [updated] = await db
+    .select()
+    .from(purchaseOrdersTable)
     .where(eq(purchaseOrdersTable.id, id))
-    .returning();
-  if (!po) {
+    .limit(1);
+  
+  if (!updated) {
     res.status(404).json({ error: "Not found" });
     return;
   }
-  res.json(fPo(po));
+  res.json(fPo(updated));
+});
+
+router.delete("/purchase-orders/:id", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id as string, 10);
+  await db.delete(purchaseOrdersTable).where(eq(purchaseOrdersTable.id, id));
+  await db.delete(procurementPurchaseOrdersTable).where(eq(procurementPurchaseOrdersTable.id, id));
+  res.status(204).end();
 });
 
 // Materials
@@ -314,7 +429,7 @@ router.get("/materials", async (_req, res): Promise<void> => {
 
 router.post("/materials", async (req, res): Promise<void> => {
   const b = req.body ?? {};
-  const [m] = await db
+  await db
     .insert(materialsTable)
     .values({
       projectId: b.projectId ?? null,
@@ -325,8 +440,15 @@ router.post("/materials", async (req, res): Promise<void> => {
       quantityCommitted: String(b.quantityCommitted ?? 0),
       quantityConsumed: String(b.quantityConsumed ?? 0),
       minimumStock: String(b.minimumStock ?? 0),
-    })
-    .returning();
+    });
+  
+  // MySQL doesn't support .returning() - query after insert
+  const [m] = await db
+    .select()
+    .from(materialsTable)
+    .orderBy(desc(materialsTable.id))
+    .limit(1);
+  
   res.status(201).json(fMat(m!));
 });
 
@@ -345,16 +467,23 @@ router.patch("/materials/:id", async (req, res): Promise<void> => {
   ]) {
     if (b[k] !== undefined) update[k] = String(b[k]);
   }
-  const [m] = await db
+  await db
     .update(materialsTable)
     .set(update)
+    .where(eq(materialsTable.id, id));
+  
+  // MySQL doesn't support .returning() - query after update
+  const [updated] = await db
+    .select()
+    .from(materialsTable)
     .where(eq(materialsTable.id, id))
-    .returning();
-  if (!m) {
+    .limit(1);
+  
+  if (!updated) {
     res.status(404).json({ error: "Not found" });
     return;
   }
-  res.json(fMat(m));
+  res.json(fMat(updated));
 });
 
 export default router;

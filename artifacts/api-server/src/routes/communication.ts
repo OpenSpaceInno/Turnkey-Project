@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc , sql} from "drizzle-orm";
 import {
   db,
   communicationsTable,
@@ -32,7 +32,7 @@ router.get("/communications", async (req, res): Promise<void> => {
 router.post("/communications", async (req, res): Promise<void> => {
   const b = req.body ?? {};
   const me = await getCurrentUser();
-  const [c] = await db
+  const result = await db
     .insert(communicationsTable)
     .values({
       projectId: b.projectId ?? null,
@@ -43,8 +43,16 @@ router.post("/communications", async (req, res): Promise<void> => {
       communicationDate: new Date(b.communicationDate),
       participants: b.participants ?? null,
       createdById: me.id,
-    })
-    .returning();
+    });
+  
+  // MySQL returns insertId - use it to fetch the created record
+  const insertId = Number(result[0].insertId);
+  const [c] = await db
+    .select()
+    .from(communicationsTable)
+    .where(eq(communicationsTable.id, insertId))
+    .limit(1);
+  
   res.status(201).json(c);
 });
 
@@ -77,7 +85,7 @@ router.get("/meetings", async (req, res): Promise<void> => {
 router.post("/meetings", async (req, res): Promise<void> => {
   const b = req.body ?? {};
   const me = await getCurrentUser();
-  const [m] = await db
+  const result = await db
     .insert(meetingsTable)
     .values({
       projectId: b.projectId,
@@ -89,8 +97,16 @@ router.post("/meetings", async (req, res): Promise<void> => {
       minutes: b.minutes ?? null,
       participants: b.participants ?? null,
       createdById: me.id,
-    })
-    .returning();
+    });
+  
+  // MySQL returns insertId - use it to fetch the created record
+  const insertId = Number(result[0].insertId);
+  const [m] = await db
+    .select()
+    .from(meetingsTable)
+    .where(eq(meetingsTable.id, insertId))
+    .limit(1);
+  
   res.status(201).json(m);
 });
 
@@ -110,11 +126,19 @@ router.patch("/meetings/:id", async (req, res): Promise<void> => {
   }
   if (b.meetingDate !== undefined)
     update.meetingDate = new Date(b.meetingDate);
-  const [m] = await db
+  
+  await db
     .update(meetingsTable)
     .set(update)
+    .where(eq(meetingsTable.id, id));
+  
+  // MySQL doesn't support .returning() - query after update
+  const [m] = await db
+    .select()
+    .from(meetingsTable)
     .where(eq(meetingsTable.id, id))
-    .returning();
+    .limit(1);
+  
   if (!m) {
     res.status(404).json({ error: "Not found" });
     return;
@@ -151,22 +175,51 @@ router.get("/documents", async (req, res): Promise<void> => {
 
 router.post("/documents", async (req, res): Promise<void> => {
   const b = req.body ?? {};
+  const projectId = parseInt((b.projectId || req.params.projectId) as string, 10);
+  if (!projectId) {
+    res.status(400).json({ error: "projectId required" });
+    return;
+  }
+  const fileName = (b.fileName || b.name || "").toString().trim() || "Untitled Document";
   const me = await getCurrentUser();
-  const [d] = await db
+  const result = await db
     .insert(documentsTable)
     .values({
-      projectId: b.projectId,
-      fileName: b.fileName,
-      fileType: b.fileType ?? null,
-      fileSize: b.fileSize ?? null,
-      fileUrl: b.fileUrl ?? null,
+      projectId,
+      fileName,
+      fileType: b.fileType ? String(b.fileType).slice(0, 64) : null,
+      fileSize: b.fileSize != null && !isNaN(Number(b.fileSize)) ? Number(b.fileSize) : null,
+      fileUrl: b.fileUrl ? String(b.fileUrl) : null,
       category: b.category ?? "general",
-      version: b.version ?? 1,
+      version: b.version ? Number(b.version) || 1 : 1,
       status: b.status ?? "active",
       uploadedById: me.id,
-    })
-    .returning();
-  res.status(201).json({ ...d, uploadedByName: me.name });
+    });
+  
+  // MySQL returns insertId - use it to fetch the created record
+  const insertId = Number(result[0].insertId);
+  const [d] = await db
+    .select()
+    .from(documentsTable)
+    .where(eq(documentsTable.id, insertId))
+    .limit(1);
+  
+  res.status(201).json({
+    ...d,
+    title: d?.fileName,
+    createdAt: d?.uploadedAt.toISOString(),
+    uploadedByName: me.name,
+  });
+});
+
+router.delete("/documents/:id", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id as string, 10);
+  if (!id) {
+    res.status(400).json({ error: "id required" });
+    return;
+  }
+  await db.delete(documentsTable).where(eq(documentsTable.id, id));
+  res.sendStatus(204);
 });
 
 export default router;

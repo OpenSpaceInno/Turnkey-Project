@@ -50,6 +50,20 @@ export default defineConfig({
     strictPort: true,
     host: "0.0.0.0",
     allowedHosts: true,
+    headers: {
+      // Remove restrictive CSP for development to allow Chrome DevTools
+      'Content-Security-Policy': '',
+    },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+      '/uploads': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+    },
     fs: {
       strict: true,
     },

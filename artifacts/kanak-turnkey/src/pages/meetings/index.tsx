@@ -167,7 +167,7 @@ export default function Meetings() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {meetings?.map((meeting) => {
+        {(Array.isArray(meetings) ? meetings : []).map((meeting) => {
           const start = new Date(meeting.meetingDate);
           const end = new Date(start.getTime() + (meeting.duration ?? 60) * 60_000);
           const hasMOM = !!meeting.minutes;
@@ -226,7 +226,7 @@ export default function Meetings() {
             </Card>
           );
         })}
-        {!meetings?.length && !isLoading && (
+        {!(Array.isArray(meetings) ? meetings : []).length && !isLoading && (
           <div className="col-span-full text-center py-12 border rounded-lg border-dashed text-muted-foreground">
             No meetings scheduled yet.
           </div>

@@ -1,0 +1,51 @@
+{
+  "name": "Kanak Turnkey — Site Execution & Offline DPR",
+  "short_name": "Kanak DPR",
+  "description": "Mobile PWA for Daily Progress Reports & Site Execution with offline submission",
+  "start_url": "/site-execution?tab=dpr",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b1120",
+  "theme_color": "#2563eb",
+  "categories": ["business", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "New DPR",
+      "short_name": "New DPR",
+      "description": "Submit a Daily Progress Report (Online or Offline)",
+      "url": "/site-execution?tab=dpr&action=new"
+    },
+    {
+      "name": "Offline Queue",
+      "short_name": "Queue",
+      "description": "View and sync offline DPR submissions",
+      "url": "/site-execution?tab=dpr&action=queue"
+    }
+  ]
+}

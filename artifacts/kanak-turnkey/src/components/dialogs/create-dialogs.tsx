@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useCreateLead,
+  useConvertLead,
   useCreateProject,
   useCreateTask,
   useListProjects,
@@ -13,6 +14,7 @@ import {
   getListTasksQueryKey,
   getGetDashboardSummaryQueryKey,
 } from "@workspace/api-client-react";
+import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
   DialogContent,
@@ -26,6 +28,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ArrowRight, FolderPlus, Loader2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -55,8 +59,12 @@ export function NewLeadDialog({ trigger }: { trigger: ReactNode }) {
   const [open, setOpen] = useState(false);
   const qc = useQueryClient();
   const create = useCreateLead();
+  const convert = useConvertLead();
+  const { toast } = useToast();
+  const [, setLocation] = useLocation();
+  const [autoCreateProject, setAutoCreateProject] = useState(true);
 
-  const [form, setForm] = useState({
+  const initialForm = {
     customerName: "",
     company: "",
     contactEmail: "",
@@ -69,12 +77,18 @@ export function NewLeadDialog({ trigger }: { trigger: ReactNode }) {
     stage: "lead_creation",
     status: "new",
     notes: "",
-  });
+  };
 
-  const submit = async () => {
+  const [form, setForm] = useState(initialForm);
+
+  const resetForm = () => setForm(initialForm);
+
+  const submit = async (createProjectOverride?: boolean) => {
     if (!form.customerName.trim()) return;
-    await create.mutateAsync({
-      data: {
+    const shouldCreateProject =
+      createProjectOverride !== undefined ? createProjectOverride : autoCreateProject;
+    try {
+      const createdLead = await create.mutateAsync({
         customerName: form.customerName,
         company: form.company || undefined,
         contactEmail: form.contactEmail || undefined,
@@ -86,42 +100,55 @@ export function NewLeadDialog({ trigger }: { trigger: ReactNode }) {
           : undefined,
         leadSource: form.leadSource || undefined,
         priority: form.priority as "urgent" | "high" | "medium" | "low",
-        stage: form.stage as
-          | "lead_creation"
-          | "site_visit"
-          | "drawings"
-          | "boq"
-          | "negotiation"
-          | "finalization",
-        status: form.status as
-          | "new"
-          | "contacted"
-          | "qualified"
-          | "lost"
-          | "won",
+        stage: shouldCreateProject ? "won" : (form.stage as any),
+        status: shouldCreateProject ? "won" : (form.status as any),
         notes: form.notes || undefined,
-      },
-    });
-    await Promise.all([
-      qc.invalidateQueries({ queryKey: getListLeadsQueryKey() }),
-      qc.invalidateQueries({ queryKey: getGetLeadsSummaryQueryKey() }),
-      qc.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() }),
-    ]);
-    setOpen(false);
-    setForm({
-      customerName: "",
-      company: "",
-      contactEmail: "",
-      contactPhone: "",
-      projectType: "",
-      location: "",
-      budgetEstimate: "",
-      leadSource: "",
-      priority: "medium",
-      stage: "lead_creation",
-      status: "new",
-      notes: "",
-    });
+      });
+
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: getListLeadsQueryKey() }),
+        qc.invalidateQueries({ queryKey: getGetLeadsSummaryQueryKey() }),
+        qc.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() }),
+        qc.invalidateQueries({ queryKey: getListProjectsQueryKey() }),
+      ]);
+
+      if (shouldCreateProject && createdLead?.id) {
+        const prjName = `${form.customerName}${
+          form.projectType ? ` — ${form.projectType}` : ""
+        }`;
+        const converted = await convert.mutateAsync({
+          id: createdLead.id,
+          data: {
+            projectName: prjName,
+            skipPrerequisites: true,
+          },
+        });
+        toast({
+          title: "Lead & Project created",
+          description: `Project "${converted?.name || prjName}" created and opened.`,
+        });
+        setOpen(false);
+        resetForm();
+        if (converted?.id) {
+          setLocation(`/projects/${converted.id}`);
+        }
+        return;
+      }
+
+      toast({
+        title: "Lead created",
+        description: `Lead for ${form.customerName} created successfully.`,
+      });
+      setOpen(false);
+      resetForm();
+    } catch (err: any) {
+      toast({
+        variant: "destructive",
+        title: "Failed to create lead",
+        description:
+          err?.message || "An error occurred while creating the lead.",
+      });
+    }
   };
 
   return (
@@ -267,16 +294,52 @@ export function NewLeadDialog({ trigger }: { trigger: ReactNode }) {
               />
             </Field>
           </div>
+          <div className="sm:col-span-2 rounded-lg border bg-muted/40 p-3 space-y-1.5">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="autoCreateProject"
+                checked={autoCreateProject}
+                onCheckedChange={(c) => setAutoCreateProject(Boolean(c))}
+              />
+              <label
+                htmlFor="autoCreateProject"
+                className="text-xs font-semibold leading-none cursor-pointer flex items-center gap-1.5"
+              >
+                <FolderPlus className="w-3.5 h-3.5 text-primary" />
+                Immediately generate Project and open Project section
+              </label>
+            </div>
+            <p className="text-[11px] text-muted-foreground pl-6">
+              Auto-generates EPC Turnkey project, Client Contract, baseline budget cost codes, and milestone billing schedule.
+            </p>
+          </div>
         </div>
-        <DialogFooter>
+        <DialogFooter className="flex-col sm:flex-row gap-2">
           <Button variant="outline" onClick={() => setOpen(false)}>
             Cancel
           </Button>
           <Button
-            onClick={submit}
-            disabled={!form.customerName.trim() || create.isPending}
+            variant="secondary"
+            type="button"
+            onClick={() => submit(false)}
+            disabled={!form.customerName.trim() || create.isPending || convert.isPending}
           >
-            {create.isPending ? "Creating..." : "Create lead"}
+            {create.isPending && !autoCreateProject ? "Saving..." : "Save as Lead only"}
+          </Button>
+          <Button
+            onClick={() => submit(true)}
+            disabled={!form.customerName.trim() || create.isPending || convert.isPending}
+            className="gap-1.5"
+          >
+            {convert.isPending || (create.isPending && autoCreateProject) ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" /> Creating Project...
+              </>
+            ) : (
+              <>
+                Create & Open Project <ArrowRight className="h-4 w-4" />
+              </>
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -339,7 +402,7 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: ReactNode; o
       description: "",
       status: "planning",
     });
-    if (onCreated && created?.id) onCreated(created.id);
+    if (onCreated && (created as any)?.id) onCreated((created as any).id);
   };
 
   return (
@@ -553,7 +616,7 @@ export function NewTaskDialog({
                 <SelectValue placeholder="Select project" />
               </SelectTrigger>
               <SelectContent>
-                {projects?.map((p) => (
+                {(Array.isArray(projects) ? projects : []).map((p) => (
                   <SelectItem key={p.id} value={String(p.id)}>
                     {p.name}
                   </SelectItem>
@@ -570,7 +633,7 @@ export function NewTaskDialog({
                 <SelectValue placeholder="Unassigned" />
               </SelectTrigger>
               <SelectContent>
-                {users?.map((u) => (
+                {(Array.isArray(users) ? users : []).map((u) => (
                   <SelectItem key={u.id} value={String(u.id)}>
                     {u.name}
                   </SelectItem>

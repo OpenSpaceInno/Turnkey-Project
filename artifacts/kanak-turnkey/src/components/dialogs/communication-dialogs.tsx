@@ -126,7 +126,7 @@ export function NewCommunicationDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">General</SelectItem>
-                {projects?.map((p) => (
+                {(Array.isArray(projects) ? projects : []).map((p) => (
                   <SelectItem key={p.id} value={String(p.id)}>
                     {p.name}
                   </SelectItem>
@@ -288,7 +288,7 @@ export function NewMeetingDialog({ trigger }: { trigger: ReactNode }) {
                 <SelectValue placeholder="Select project" />
               </SelectTrigger>
               <SelectContent>
-                {projects?.map((p) => (
+                {(Array.isArray(projects) ? projects : []).map((p) => (
                   <SelectItem key={p.id} value={String(p.id)}>
                     {p.name}
                   </SelectItem>
@@ -375,24 +375,90 @@ export function NewDocumentDialog({ trigger }: { trigger: ReactNode }) {
   const qc = useQueryClient();
   const create = useCreateDocument();
   const { data: projects } = useListProjects();
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploadedUrls, setUploadedUrls] = useState<string[]>([]);
+
+  // Load last used values from localStorage
+  const lastCategory = typeof window !== 'undefined' 
+    ? localStorage.getItem('turnkey_last_upload_category') || 'general'
+    : 'general';
+  const lastStatus = typeof window !== 'undefined'
+    ? localStorage.getItem('turnkey_last_upload_status') || 'active'
+    : 'active';
 
   const [form, setForm] = useState({
     projectId: "",
     fileName: "",
     fileType: "",
     fileUrl: "",
-    category: "general",
-    status: "active",
+    category: lastCategory,
+    status: lastStatus,
   });
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      setSelectedFiles(prev => [...prev, ...files]);
+      // Auto-populate fileName from first file if empty
+      if (!form.fileName && files[0]) {
+        setForm({
+          ...form,
+          fileName: files[0].name,
+          fileType: files[0].name.split('.').pop() || "",
+        });
+      }
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+    setUploadedUrls(prev => prev.filter((_, i) => i !== index));
+  };
 
   const submit = async () => {
     if (!form.projectId || !form.fileName.trim()) return;
+    
+    let fileUrl = form.fileUrl; // Start with manual URL if provided
+    
+    // If files were selected, upload them first and use the first file's URL
+    if (selectedFiles.length > 0) {
+      const fileUrls: string[] = [];
+      try {
+        for (const file of selectedFiles) {
+          const formData = new FormData();
+          formData.append('file', file);
+          
+          const uploadResponse = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData,
+          });
+          
+          if (uploadResponse.ok) {
+            const uploadData = await uploadResponse.json();
+            fileUrls.push(uploadData.fileUrl);
+          }
+        }
+        // Use first uploaded file URL
+        if (fileUrls.length > 0) {
+          fileUrl = fileUrls[0];
+        }
+      } catch (error) {
+        console.error('File upload error:', error);
+      }
+    }
+    
+    // Save last used category and status to localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('turnkey_last_upload_category', form.category);
+      localStorage.setItem('turnkey_last_upload_status', form.status);
+    }
+    
     await create.mutateAsync({
       data: {
         projectId: Number(form.projectId),
         fileName: form.fileName,
         fileType: form.fileType || null,
-        fileUrl: form.fileUrl || null,
+        fileUrl: fileUrl || null,
         category: form.category as
           | "general"
           | "contract"
@@ -404,13 +470,15 @@ export function NewDocumentDialog({ trigger }: { trigger: ReactNode }) {
     });
     await qc.invalidateQueries({ queryKey: getListDocumentsQueryKey() });
     setOpen(false);
+    setSelectedFiles([]);
+    setUploadedUrls([]);
     setForm({
       projectId: "",
       fileName: "",
       fileType: "",
       fileUrl: "",
-      category: "general",
-      status: "active",
+      category: form.category,
+      status: form.status,
     });
   };
 
@@ -421,7 +489,7 @@ export function NewDocumentDialog({ trigger }: { trigger: ReactNode }) {
         <DialogHeader>
           <DialogTitle>Upload Document</DialogTitle>
           <DialogDescription>
-            Register a document and link it to a project.
+            Upload a file from your computer or provide a URL to an existing document.
           </DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-2">
@@ -445,7 +513,7 @@ export function NewDocumentDialog({ trigger }: { trigger: ReactNode }) {
                 <SelectValue placeholder="Select project" />
               </SelectTrigger>
               <SelectContent>
-                {projects?.map((p) => (
+                {(Array.isArray(projects) ? projects : []).map((p) => (
                   <SelectItem key={p.id} value={String(p.id)}>
                     {p.name}
                   </SelectItem>
@@ -492,15 +560,124 @@ export function NewDocumentDialog({ trigger }: { trigger: ReactNode }) {
               </SelectContent>
             </Select>
           </Field>
+          
+          {/* Photos Section */}
           <div className="sm:col-span-2">
-            <Field label="File URL">
+            <div className="flex items-center justify-between mb-2">
+              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                Photos
+              </Label>
+              <label
+                htmlFor="photo-upload"
+                className="flex items-center gap-1.5 text-xs font-medium text-primary hover:underline cursor-pointer"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                Add Photos
+              </label>
+              <input
+                id="photo-upload"
+                type="file"
+                className="hidden"
+                multiple
+                accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx"
+                onChange={handleFileChange}
+              />
+            </div>
+            
+            {selectedFiles.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {selectedFiles.map((file, index) => {
+                  const isImage = file.type.startsWith('image/');
+                  let fileUrl = '';
+                  try {
+                    fileUrl = URL.createObjectURL(file);
+                  } catch (e) {
+                    console.error('Error creating object URL:', e);
+                  }
+                  
+                  return (
+                    <div key={`${file.name}-${index}`} className="relative group">
+                      <div className="aspect-square rounded-lg border-2 border-border overflow-hidden bg-muted flex items-center justify-center">
+                        {isImage && fileUrl ? (
+                          <img
+                            src={fileUrl}
+                            alt={file.name}
+                            className="w-full h-full object-cover"
+                            onError={() => console.error('Image load error:', file.name)}
+                          />
+                        ) : (
+                          <div className="flex flex-col items-center justify-center p-4 text-center">
+                            <svg className="w-8 h-8 text-muted-foreground mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <p className="text-xs font-medium text-muted-foreground truncate w-full">
+                              {file.name}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeFile(index)}
+                        className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                      <p className="text-xs text-muted-foreground text-center mt-1 truncate">
+                        {(file.size / 1024).toFixed(0)} KB
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <label
+                htmlFor="photo-upload-area"
+                className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-accent/50 transition-colors"
+              >
+                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                  <svg className="w-10 h-10 mb-3 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <p className="mb-2 text-sm text-muted-foreground">
+                    <span className="font-semibold">Click to upload</span> site photos
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    JPG, PNG, HEIC supported
+                  </p>
+                </div>
+                <input
+                  id="photo-upload-area"
+                  type="file"
+                  className="hidden"
+                  multiple
+                  accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx"
+                  onChange={handleFileChange}
+                />
+              </label>
+            )}
+          </div>
+          
+          {/* File URL - External Link Option */}
+          <div className="sm:col-span-2">
+            <Field label="File URL (optional)">
               <Input
                 value={form.fileUrl}
                 onChange={(e) =>
                   setForm({ ...form, fileUrl: e.target.value })
                 }
-                placeholder="https://..."
+                placeholder="https://... (or leave blank to use uploaded files)"
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                Provide an external URL if not uploading files above
+              </p>
             </Field>
           </div>
         </div>

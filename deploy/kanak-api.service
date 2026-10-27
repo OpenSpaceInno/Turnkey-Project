@@ -1,0 +1,24 @@
+[Unit]
+Description=Kanak TurnKey ERP Backend API Server
+After=network.target mysql.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/kanak-turnkey/artifacts/api-server
+Environment=NODE_ENV=production
+EnvironmentFile=/var/www/kanak-turnkey/.env
+ExecStart=/usr/bin/node --enable-source-maps ./dist/index.mjs
+Restart=always
+RestartSec=5
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=kanak-api
+
+# Security sandbox
+ProtectSystem=full
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

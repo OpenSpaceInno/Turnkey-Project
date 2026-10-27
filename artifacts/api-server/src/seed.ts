@@ -28,7 +28,27 @@ import {
   documentsTable,
   notificationsTable,
   auditLogsTable,
+  // Procurement Module Tables
+  procurementMaterialRequestsTable,
+  procurementMaterialRequestItemsTable,
+  procurementRfqsTable,
+  procurementRfqItemsTable,
+  procurementRfqVendorsTable,
+  procurementVendorQuotesTable,
+  procurementVendorQuoteItemsTable,
+  procurementPurchaseOrdersTable,
+  procurementPurchaseOrderItemsTable,
+  procurementMaterialReceiptsTable,
+  procurementMaterialReceiptItemsTable,
+  procurementQualityInspectionsTable,
+  procurementQualityInspectionItemsTable,
+  procurementInventoryItemsTable,
+  procurementInventoryTransactionsTable,
+  procurementVendorFollowUpsTable,
+  procurementNotificationsTable,
 } from "@workspace/db";
+import { eq as eqFilter } from "drizzle-orm";
+import bcrypt from "bcryptjs";
 import { logger } from "./lib/logger";
 
 export async function seedIfEmpty(): Promise<void> {
@@ -39,12 +59,15 @@ export async function seedIfEmpty(): Promise<void> {
   }
   logger.info("Seeding database");
 
-  const [admin, pm, eng, acct, proc, viewer] = await db
+  const defaultPasswordHash = await bcrypt.hash("password123", 10);
+
+  await db
     .insert(usersTable)
     .values([
       {
         email: "ananya.rao@kanak.in",
         name: "Ananya Rao",
+        passwordHash: defaultPasswordHash,
         avatarUrl: null,
         roles: [
           "admin",
@@ -59,6 +82,7 @@ export async function seedIfEmpty(): Promise<void> {
       {
         email: "rohan.mehta@kanak.in",
         name: "Rohan Mehta",
+        passwordHash: defaultPasswordHash,
         avatarUrl: null,
         roles: ["project_manager", "viewer"],
         activeRole: "project_manager",
@@ -66,6 +90,7 @@ export async function seedIfEmpty(): Promise<void> {
       {
         email: "priya.iyer@kanak.in",
         name: "Priya Iyer",
+        passwordHash: defaultPasswordHash,
         avatarUrl: null,
         roles: ["engineer", "viewer"],
         activeRole: "engineer",
@@ -73,6 +98,7 @@ export async function seedIfEmpty(): Promise<void> {
       {
         email: "vikram.shah@kanak.in",
         name: "Vikram Shah",
+        passwordHash: defaultPasswordHash,
         avatarUrl: null,
         roles: ["accountant", "viewer"],
         activeRole: "accountant",
@@ -80,6 +106,7 @@ export async function seedIfEmpty(): Promise<void> {
       {
         email: "neha.kapoor@kanak.in",
         name: "Neha Kapoor",
+        passwordHash: defaultPasswordHash,
         avatarUrl: null,
         roles: ["procurement_officer", "viewer"],
         activeRole: "procurement_officer",
@@ -87,17 +114,26 @@ export async function seedIfEmpty(): Promise<void> {
       {
         email: "arjun.singh@kanak.in",
         name: "Arjun Singh",
+        passwordHash: defaultPasswordHash,
         avatarUrl: null,
         roles: ["viewer"],
         activeRole: "viewer",
       },
-    ])
-    .returning();
+    ]);
+
+  // Query the inserted users since MySQL doesn't support .returning()
+  const users = await db.select().from(usersTable);
+  const admin = users.find(u => u.email === "ananya.rao@kanak.in");
+  const pm = users.find(u => u.email === "rohan.mehta@kanak.in");
+  const eng = users.find(u => u.email === "priya.iyer@kanak.in");
+  const acct = users.find(u => u.email === "vikram.shah@kanak.in");
+  const proc = users.find(u => u.email === "neha.kapoor@kanak.in");
+  const viewer = users.find(u => u.email === "arjun.singh@kanak.in");
 
   const today = new Date();
   const ymd = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}`;
 
-  const leads = await db
+  await db
     .insert(leadsTable)
     .values([
       {
@@ -185,8 +221,10 @@ export async function seedIfEmpty(): Promise<void> {
         expectedClosureDate: "2026-04-01",
         notes: "Lost to local contractor on price.",
       },
-    ])
-    .returning();
+    ]);
+
+  // Query the inserted leads since MySQL doesn't support .returning()
+  const leads = await db.select().from(leadsTable).orderBy(leadsTable.id);
 
   await db.insert(leadActivitiesTable).values([
     {
@@ -280,15 +318,18 @@ export async function seedIfEmpty(): Promise<void> {
     },
   ]);
 
-  const [boq1] = await db
+  await db
     .insert(boqsTable)
     .values({
       leadId: leads[0]!.id,
       version: 1,
       status: "submitted",
       createdById: pm!.id,
-    })
-    .returning();
+    });
+
+  // Query the inserted BOQ since MySQL doesn't support .returning()
+  const boqs = await db.select().from(boqsTable).where(eqFilter(boqsTable.leadId, leads[0]!.id));
+  const boq1 = boqs[0];
 
   const items: Array<{
     qty: number;
@@ -339,7 +380,7 @@ export async function seedIfEmpty(): Promise<void> {
       marginTotal: marT.toFixed(2),
       grandTotal: (sub + taxT + marT).toFixed(2),
     })
-    .where(eq(boqsTable.id, boq1!.id));
+    .where(eqFilter(boqsTable.id, boq1!.id));
 
   await db.insert(negotiationsTable).values([
     {
@@ -365,7 +406,7 @@ export async function seedIfEmpty(): Promise<void> {
     },
   ]);
 
-  const projects = await db
+  await db
     .insert(projectsTable)
     .values([
       {
@@ -440,8 +481,10 @@ export async function seedIfEmpty(): Promise<void> {
         teamSize: 8,
         createdById: pm!.id,
       },
-    ])
-    .returning();
+    ]);
+
+  // Query the inserted projects since MySQL doesn't support .returning()
+  const projects = await db.select().from(projectsTable).orderBy(projectsTable.id);
 
   await db.insert(tasksTable).values([
     {
@@ -669,7 +712,7 @@ export async function seedIfEmpty(): Promise<void> {
     },
   ]);
 
-  const vendors = await db
+  await db
     .insert(vendorsTable)
     .values([
       {
@@ -722,10 +765,12 @@ export async function seedIfEmpty(): Promise<void> {
         rating: "3.9",
         status: "inactive",
       },
-    ])
-    .returning();
+    ]);
 
-  const matReqs = await db
+  // Query the inserted vendors since MySQL doesn't support .returning()
+  const vendors = await db.select().from(vendorsTable).orderBy(vendorsTable.id);
+
+  await db
     .insert(materialRequestsTable)
     .values([
       {
@@ -753,10 +798,12 @@ export async function seedIfEmpty(): Promise<void> {
         status: "pending",
         createdById: eng!.id,
       },
-    ])
-    .returning();
+    ]);
 
-  const [rfq1] = await db
+  // Query the inserted material requests since MySQL doesn't support .returning()
+  const matReqs = await db.select().from(materialRequestsTable).orderBy(materialRequestsTable.id);
+
+  await db
     .insert(rfqsTable)
     .values({
       projectId: projects[0]!.id,
@@ -766,8 +813,11 @@ export async function seedIfEmpty(): Promise<void> {
         "Need premium-grade vinyl flooring with 10-year warranty. Delivery to Hinjewadi site.",
       status: "quotes_received",
       createdById: proc!.id,
-    })
-    .returning();
+    });
+
+  // Query the inserted RFQ since MySQL doesn't support .returning()
+  const rfqs = await db.select().from(rfqsTable).orderBy(rfqsTable.id);
+  const rfq1 = rfqs[0];
 
   await db.insert(quotationsTable).values([
     {
@@ -796,7 +846,7 @@ export async function seedIfEmpty(): Promise<void> {
     },
   ]);
 
-  await db.update(rfqsTable).set({ status: "awarded" }).where(eq(rfqsTable.id, rfq1!.id));
+  await db.update(rfqsTable).set({ status: "awarded" }).where(eqFilter(rfqsTable.id, rfq1!.id));
 
   await db.insert(rfqsTable).values({
     projectId: projects[1]!.id,
@@ -806,7 +856,7 @@ export async function seedIfEmpty(): Promise<void> {
     createdById: proc!.id,
   });
 
-  const pos = await db
+  await db
     .insert(purchaseOrdersTable)
     .values([
       {
@@ -842,14 +892,16 @@ export async function seedIfEmpty(): Promise<void> {
         inspectionStatus: "passed",
         createdById: proc!.id,
       },
-    ])
-    .returning();
+    ]);
+
+  // Query the inserted purchase orders since MySQL doesn't support .returning()
+  const purchaseOrders = await db.select().from(purchaseOrdersTable).orderBy(purchaseOrdersTable.id);
 
   await db.insert(vendorInvoicesTable).values([
     {
       projectId: projects[1]!.id,
       vendorId: vendors[2]!.id,
-      purchaseOrderId: pos[2]!.id,
+      purchaseOrderId: purchaseOrders[2]!.id,
       invoiceNumber: "HVAC-2026-018",
       amount: "4800000",
       status: "matched",
@@ -857,7 +909,7 @@ export async function seedIfEmpty(): Promise<void> {
     {
       projectId: projects[0]!.id,
       vendorId: vendors[1]!.id,
-      purchaseOrderId: pos[1]!.id,
+      purchaseOrderId: purchaseOrders[1]!.id,
       invoiceNumber: "POL-INV-2026-204",
       amount: "1850000",
       discrepancyNotes: "Invoiced amount exceeds PO by INR 30,000.",
@@ -1161,5 +1213,962 @@ export async function seedIfEmpty(): Promise<void> {
     },
   ]);
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PROCUREMENT MODULE SEED DATA
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  logger.info("Seeding procurement module data...");
+
+  // Material Requests with different statuses across workflow stages
+  await db.insert(procurementMaterialRequestsTable).values([
+    {
+      requestNumber: "MR-2026-0001",
+      projectId: projects[0]!.id,
+      title: "Premium vinyl flooring for Floor 5",
+      description: "High-grade vinyl flooring with 10-year warranty for executive floors",
+      category: "Interior Materials",
+      priority: "high",
+      requiredDate: "2026-05-15",
+      status: "approved",
+      requestedById: eng!.id,
+      approvedById: pm!.id,
+      approvalDate: new Date("2026-04-10T09:00:00Z"),
+      estimatedCost: "850000",
+      notes: "Client prefers German brand if available",
+    },
+    {
+      requestNumber: "MR-2026-0002",
+      projectId: projects[0]!.id,
+      title: "Suspended ceiling tiles for Floors 4-6",
+      description: "Acoustic ceiling tiles with fire rating",
+      category: "Civil Materials",
+      priority: "medium",
+      requiredDate: "2026-05-20",
+      status: "pending_approval",
+      requestedById: eng!.id,
+      estimatedCost: "420000",
+      notes: "Requires manager approval",
+    },
+    {
+      requestNumber: "MR-2026-0003",
+      projectId: projects[1]!.id,
+      title: "Copper wiring 4mm for riser shaft",
+      description: "High-conductivity copper wiring for electrical risers",
+      category: "Electrical",
+      priority: "urgent",
+      requiredDate: "2026-04-28",
+      status: "rejected",
+      requestedById: eng!.id,
+      rejectedById: pm!.id,
+      rejectionDate: new Date("2026-04-18T14:30:00Z"),
+      rejectionReason: "Budget constraints - Please revise specification to standard grade",
+      estimatedCost: "680000",
+    },
+    {
+      requestNumber: "MR-2026-0004",
+      projectId: projects[1]!.id,
+      title: "HVAC ducting materials",
+      description: "Galvanized steel ducting for floors 15-18",
+      category: "MEP",
+      priority: "high",
+      requiredDate: "2026-05-10",
+      status: "rfq_generated",
+      requestedById: eng!.id,
+      approvedById: pm!.id,
+      approvalDate: new Date("2026-04-15T11:00:00Z"),
+      estimatedCost: "1250000",
+    },
+    {
+      requestNumber: "MR-2026-0005",
+      projectId: projects[0]!.id,
+      title: "LED lighting fixtures - conference rooms",
+      description: "Energy-efficient LED panels with smart controls",
+      category: "Electrical",
+      priority: "medium",
+      requiredDate: "2026-05-25",
+      status: "draft",
+      requestedById: eng!.id,
+      estimatedCost: "320000",
+    },
+  ]);
+
+  const procMRs = await db.select().from(procurementMaterialRequestsTable).orderBy(procurementMaterialRequestsTable.id);
+
+  // Material Request Items
+  await db.insert(procurementMaterialRequestItemsTable).values([
+    // MR-2026-0001 items (vinyl flooring)
+    {
+      materialRequestId: procMRs[0]!.id,
+      itemName: "Premium vinyl flooring tiles",
+      description: "German brand, 12mm thickness",
+      specification: "Fire rating B1, wear layer 0.7mm, dimensions 600x600mm",
+      quantity: "12000",
+      unit: "sqft",
+      estimatedUnitPrice: "68",
+      estimatedTotal: "816000",
+      sortOrder: 0,
+    },
+    {
+      materialRequestId: procMRs[0]!.id,
+      itemName: "Vinyl flooring adhesive",
+      description: "Acrylic-based adhesive",
+      specification: "Coverage 250 sqft/gallon",
+      quantity: "50",
+      unit: "gallon",
+      estimatedUnitPrice: "680",
+      estimatedTotal: "34000",
+      sortOrder: 1,
+    },
+    // MR-2026-0002 items (ceiling tiles)
+    {
+      materialRequestId: procMRs[1]!.id,
+      itemName: "Acoustic ceiling tiles 600x600",
+      description: "Fire-rated mineral fiber tiles",
+      specification: "NRC 0.70, CAC 35, fire rating A",
+      quantity: "8500",
+      unit: "sqft",
+      estimatedUnitPrice: "45",
+      estimatedTotal: "382500",
+      sortOrder: 0,
+    },
+    {
+      materialRequestId: procMRs[1]!.id,
+      itemName: "T-grid suspension system",
+      description: "Galvanized steel grid",
+      specification: "24mm width, load capacity 3kg/sqft",
+      quantity: "8500",
+      unit: "sqft",
+      estimatedUnitPrice: "22",
+      estimatedTotal: "187000",
+      sortOrder: 1,
+    },
+    // MR-2026-0003 items (copper wiring)
+    {
+      materialRequestId: procMRs[2]!.id,
+      itemName: "Copper wiring 4mm single core",
+      description: "High-conductivity copper",
+      specification: "IS 694:2010, 99.9% pure copper, PVC insulated",
+      quantity: "4500",
+      unit: "m",
+      estimatedUnitPrice: "148",
+      estimatedTotal: "666000",
+      sortOrder: 0,
+    },
+    // MR-2026-0004 items (HVAC ducting)
+    {
+      materialRequestId: procMRs[3]!.id,
+      itemName: "Galvanized steel ducting 600x400mm",
+      description: "Rectangular duct sections",
+      specification: "24 gauge, GI coated, flanged connections",
+      quantity: "250",
+      unit: "m",
+      estimatedUnitPrice: "2400",
+      estimatedTotal: "600000",
+      sortOrder: 0,
+    },
+    {
+      materialRequestId: procMRs[3]!.id,
+      itemName: "Flexible ducting insulation",
+      description: "Fiberglass insulation wrap",
+      specification: "50mm thickness, R-value 3.5",
+      quantity: "280",
+      unit: "m",
+      estimatedUnitPrice: "420",
+      estimatedTotal: "117600",
+      sortOrder: 1,
+    },
+    {
+      materialRequestId: procMRs[3]!.id,
+      itemName: "Duct fittings and dampers",
+      description: "Elbows, reducers, volume dampers",
+      specification: "Complete fitting set for 250m run",
+      quantity: "1",
+      unit: "lot",
+      estimatedUnitPrice: "185000",
+      estimatedTotal: "185000",
+      sortOrder: 2,
+    },
+  ]);
+
+  // RFQs - Request for Quotations
+  await db.insert(procurementRfqsTable).values([
+    {
+      rfqNumber: "RFQ-2026-0001",
+      materialRequestId: procMRs[0]!.id,
+      projectId: projects[0]!.id,
+      title: "Premium vinyl flooring for Floor 5 - 12,000 sqft",
+      description: "Seeking quotations for high-grade vinyl flooring with 10-year warranty. Delivery to Hinjewadi site.",
+      status: "quotes_received",
+      issueDate: "2026-04-11",
+      dueDate: "2026-04-18",
+      sentToVendorCount: 3,
+      quotesReceivedCount: 3,
+      createdById: proc!.id,
+      notes: "Prefer German brands, must include installation",
+    },
+    {
+      rfqNumber: "RFQ-2026-0002",
+      materialRequestId: procMRs[3]!.id,
+      projectId: projects[1]!.id,
+      title: "HVAC ducting materials - 250m",
+      description: "Galvanized steel ducting with insulation for floors 15-18",
+      status: "receiving_quotes",
+      issueDate: "2026-04-16",
+      dueDate: "2026-04-23",
+      sentToVendorCount: 4,
+      quotesReceivedCount: 2,
+      createdById: proc!.id,
+      notes: "Material certification required",
+    },
+  ]);
+
+  const procRFQs = await db.select().from(procurementRfqsTable).orderBy(procurementRfqsTable.id);
+
+  // RFQ Items
+  await db.insert(procurementRfqItemsTable).values([
+    // RFQ-2026-0001 items
+    {
+      rfqId: procRFQs[0]!.id,
+      itemName: "Premium vinyl flooring tiles",
+      description: "German brand, 12mm thickness",
+      specification: "Fire rating B1, wear layer 0.7mm, dimensions 600x600mm",
+      quantity: "12000",
+      unit: "sqft",
+      sortOrder: 0,
+    },
+    {
+      rfqId: procRFQs[0]!.id,
+      itemName: "Vinyl flooring adhesive",
+      description: "Acrylic-based adhesive",
+      specification: "Coverage 250 sqft/gallon",
+      quantity: "50",
+      unit: "gallon",
+      sortOrder: 1,
+    },
+    // RFQ-2026-0002 items
+    {
+      rfqId: procRFQs[1]!.id,
+      itemName: "Galvanized steel ducting 600x400mm",
+      description: "Rectangular duct sections",
+      specification: "24 gauge, GI coated, flanged connections",
+      quantity: "250",
+      unit: "m",
+      sortOrder: 0,
+    },
+    {
+      rfqId: procRFQs[1]!.id,
+      itemName: "Flexible ducting insulation",
+      description: "Fiberglass insulation wrap",
+      specification: "50mm thickness, R-value 3.5",
+      quantity: "280",
+      unit: "m",
+      sortOrder: 1,
+    },
+    {
+      rfqId: procRFQs[1]!.id,
+      itemName: "Duct fittings and dampers",
+      description: "Elbows, reducers, volume dampers",
+      specification: "Complete fitting set for 250m run",
+      quantity: "1",
+      unit: "lot",
+      sortOrder: 2,
+    },
+  ]);
+
+  // RFQ Vendors - Track which vendors received RFQs
+  await db.insert(procurementRfqVendorsTable).values([
+    // RFQ-2026-0001 vendors
+    {
+      rfqId: procRFQs[0]!.id,
+      vendorId: vendors[3]!.id, // Ridgeline Interiors
+      sentDate: new Date("2026-04-11T10:00:00Z"),
+      respondedDate: new Date("2026-04-15T14:30:00Z"),
+      status: "responded",
+    },
+    {
+      rfqId: procRFQs[0]!.id,
+      vendorId: vendors[0]!.id, // Aarav Steel & Cement
+      sentDate: new Date("2026-04-11T10:00:00Z"),
+      respondedDate: new Date("2026-04-16T09:00:00Z"),
+      status: "responded",
+    },
+    {
+      rfqId: procRFQs[0]!.id,
+      vendorId: vendors[1]!.id, // Polaris Electricals
+      sentDate: new Date("2026-04-11T10:00:00Z"),
+      respondedDate: new Date("2026-04-14T16:00:00Z"),
+      status: "responded",
+    },
+    // RFQ-2026-0002 vendors
+    {
+      rfqId: procRFQs[1]!.id,
+      vendorId: vendors[2]!.id, // Helios HVAC Systems
+      sentDate: new Date("2026-04-16T11:00:00Z"),
+      respondedDate: new Date("2026-04-19T10:00:00Z"),
+      status: "responded",
+    },
+    {
+      rfqId: procRFQs[1]!.id,
+      vendorId: vendors[0]!.id, // Aarav Steel & Cement
+      sentDate: new Date("2026-04-16T11:00:00Z"),
+      respondedDate: new Date("2026-04-20T15:00:00Z"),
+      status: "responded",
+    },
+    {
+      rfqId: procRFQs[1]!.id,
+      vendorId: vendors[1]!.id, // Polaris Electricals
+      sentDate: new Date("2026-04-16T11:00:00Z"),
+      status: "sent",
+    },
+    {
+      rfqId: procRFQs[1]!.id,
+      vendorId: vendors[3]!.id, // Ridgeline Interiors
+      sentDate: new Date("2026-04-16T11:00:00Z"),
+      status: "declined",
+    },
+  ]);
+
+  // Get RFQ items for quote items
+  const procRFQItems = await db.select().from(procurementRfqItemsTable).orderBy(procurementRfqItemsTable.id);
+
+  // Vendor Quotes
+  await db.insert(procurementVendorQuotesTable).values([
+    // Quotes for RFQ-2026-0001 (vinyl flooring)
+    {
+      quoteNumber: "QT-RID-2026-0012",
+      rfqId: procRFQs[0]!.id,
+      vendorId: vendors[3]!.id, // Ridgeline Interiors
+      quotedDate: "2026-04-15",
+      validUntil: "2026-05-15",
+      deliveryDays: 18,
+      deliveryTerms: "FOB site, delivery included",
+      paymentTerms: "30% advance, 70% on delivery",
+      subtotal: "798000",
+      taxPercent: "18",
+      taxAmount: "143640",
+      shippingCost: "0",
+      totalAmount: "941640",
+      isSelected: true,
+      selectionReason: "Best overall value with warranty and delivery terms",
+      selectedById: proc!.id,
+      selectedDate: new Date("2026-04-18T10:00:00Z"),
+      status: "selected",
+      notes: "10-year warranty included, German brand Tarkett",
+    },
+    {
+      quoteNumber: "QT-AAR-2026-0032",
+      rfqId: procRFQs[0]!.id,
+      vendorId: vendors[0]!.id, // Aarav Steel & Cement
+      quotedDate: "2026-04-16",
+      validUntil: "2026-05-10",
+      deliveryDays: 14,
+      deliveryTerms: "Ex-warehouse, transport extra",
+      paymentTerms: "50% advance, 50% on delivery",
+      subtotal: "842000",
+      taxPercent: "18",
+      taxAmount: "151560",
+      shippingCost: "25000",
+      totalAmount: "1018560",
+      isSelected: false,
+      status: "rejected",
+      notes: "Higher price, no installation service",
+    },
+    {
+      quoteNumber: "QT-POL-2026-0048",
+      rfqId: procRFQs[0]!.id,
+      vendorId: vendors[1]!.id, // Polaris Electricals
+      quotedDate: "2026-04-14",
+      validUntil: "2026-05-05",
+      deliveryDays: 10,
+      deliveryTerms: "Delivered to site",
+      paymentTerms: "25% advance, balance on delivery",
+      subtotal: "885000",
+      taxPercent: "18",
+      taxAmount: "159300",
+      shippingCost: "0",
+      totalAmount: "1044300",
+      isSelected: false,
+      status: "rejected",
+      notes: "Fastest delivery but highest price, Chinese brand",
+    },
+    // Quotes for RFQ-2026-0002 (HVAC ducting)
+    {
+      quoteNumber: "QT-HEL-2026-0021",
+      rfqId: procRFQs[1]!.id,
+      vendorId: vendors[2]!.id, // Helios HVAC Systems
+      quotedDate: "2026-04-19",
+      validUntil: "2026-05-19",
+      deliveryDays: 21,
+      deliveryTerms: "Delivered and unloaded at site",
+      paymentTerms: "20% advance, 80% within 30 days of delivery",
+      subtotal: "1180000",
+      taxPercent: "18",
+      taxAmount: "212400",
+      shippingCost: "0",
+      totalAmount: "1392400",
+      isSelected: false,
+      status: "under_review",
+      notes: "Premium quality, comprehensive certification",
+    },
+    {
+      quoteNumber: "QT-AAR-2026-0033",
+      rfqId: procRFQs[1]!.id,
+      vendorId: vendors[0]!.id, // Aarav Steel & Cement
+      quotedDate: "2026-04-20",
+      validUntil: "2026-05-15",
+      deliveryDays: 14,
+      deliveryTerms: "Ex-warehouse Pune",
+      paymentTerms: "40% advance, 60% on delivery",
+      subtotal: "1085000",
+      taxPercent: "18",
+      taxAmount: "195300",
+      shippingCost: "32000",
+      totalAmount: "1312300",
+      isSelected: false,
+      status: "under_review",
+      notes: "Lower price but need to arrange transport",
+    },
+  ]);
+
+  const procQuotes = await db.select().from(procurementVendorQuotesTable).orderBy(procurementVendorQuotesTable.id);
+
+  // Vendor Quote Items
+  await db.insert(procurementVendorQuoteItemsTable).values([
+    // Quote 1 items (Ridgeline - selected)
+    {
+      quoteId: procQuotes[0]!.id,
+      rfqItemId: procRFQItems[0]!.id,
+      itemName: "Premium vinyl flooring tiles - Tarkett German",
+      quantity: "12000",
+      unit: "sqft",
+      unitPrice: "64",
+      totalPrice: "768000",
+      remarks: "10-year warranty, installation included",
+      sortOrder: 0,
+    },
+    {
+      quoteId: procQuotes[0]!.id,
+      rfqItemId: procRFQItems[1]!.id,
+      itemName: "Vinyl flooring adhesive - Bostik",
+      quantity: "50",
+      unit: "gallon",
+      unitPrice: "600",
+      totalPrice: "30000",
+      remarks: "Compatible with Tarkett flooring",
+      sortOrder: 1,
+    },
+    // Quote 2 items (Aarav)
+    {
+      quoteId: procQuotes[1]!.id,
+      rfqItemId: procRFQItems[0]!.id,
+      itemName: "Premium vinyl flooring tiles - Armstrong",
+      quantity: "12000",
+      unit: "sqft",
+      unitPrice: "68",
+      totalPrice: "816000",
+      remarks: "Material only, installation extra",
+      sortOrder: 0,
+    },
+    {
+      quoteId: procQuotes[1]!.id,
+      rfqItemId: procRFQItems[1]!.id,
+      itemName: "Vinyl flooring adhesive",
+      quantity: "50",
+      unit: "gallon",
+      unitPrice: "520",
+      totalPrice: "26000",
+      sortOrder: 1,
+    },
+    // Quote 3 items (Polaris)
+    {
+      quoteId: procQuotes[2]!.id,
+      rfqItemId: procRFQItems[0]!.id,
+      itemName: "Premium vinyl flooring tiles - Gerflor",
+      quantity: "12000",
+      unit: "sqft",
+      unitPrice: "72",
+      totalPrice: "864000",
+      remarks: "Express delivery, installation included",
+      sortOrder: 0,
+    },
+    {
+      quoteId: procQuotes[2]!.id,
+      rfqItemId: procRFQItems[1]!.id,
+      itemName: "Vinyl adhesive premium grade",
+      quantity: "50",
+      unit: "gallon",
+      unitPrice: "420",
+      totalPrice: "21000",
+      sortOrder: 1,
+    },
+  ]);
+
+  // Update RFQ status and selected quote
+  await db.update(procurementRfqsTable)
+    .set({ status: "completed", selectedQuoteId: procQuotes[0]!.id, closedDate: "2026-04-18" })
+    .where(eqFilter(procurementRfqsTable.id, procRFQs[0]!.id));
+
+  // Purchase Orders
+  await db.insert(procurementPurchaseOrdersTable).values([
+    {
+      poNumber: "PO-2026-0001",
+      rfqId: procRFQs[0]!.id,
+      quoteId: procQuotes[0]!.id,
+      materialRequestId: procMRs[0]!.id,
+      projectId: projects[0]!.id,
+      vendorId: vendors[3]!.id, // Ridgeline Interiors
+      poDate: "2026-04-19",
+      expectedDeliveryDate: "2026-05-07",
+      subtotal: "798000",
+      taxAmount: "143640",
+      shippingCost: "0",
+      totalAmount: "941640",
+      deliveryTerms: "FOB site, delivery included",
+      paymentTerms: "30% advance, 70% on delivery",
+      status: "delivered",
+      isAcknowledged: true,
+      acknowledgmentDate: new Date("2026-04-20T09:30:00Z"),
+      acknowledgmentNotes: "PO received and accepted. Delivery confirmed for May 7.",
+      deliveryStatus: "delivered",
+      createdById: proc!.id,
+      approvedById: pm!.id,
+      notes: "High priority - Floor 5 project",
+    },
+  ]);
+
+  const procPOs = await db.select().from(procurementPurchaseOrdersTable).orderBy(procurementPurchaseOrdersTable.id);
+
+  // Purchase Order Items
+  await db.insert(procurementPurchaseOrderItemsTable).values([
+    {
+      poId: procPOs[0]!.id,
+      itemName: "Premium vinyl flooring tiles - Tarkett German",
+      description: "German brand, 12mm thickness",
+      specification: "Fire rating B1, wear layer 0.7mm, dimensions 600x600mm",
+      quantity: "12000",
+      unit: "sqft",
+      unitPrice: "64",
+      totalPrice: "768000",
+      receivedQuantity: "12000",
+      acceptedQuantity: "11850",
+      rejectedQuantity: "150",
+      sortOrder: 0,
+    },
+    {
+      poId: procPOs[0]!.id,
+      itemName: "Vinyl flooring adhesive - Bostik",
+      description: "Acrylic-based adhesive",
+      specification: "Coverage 250 sqft/gallon",
+      quantity: "50",
+      unit: "gallon",
+      unitPrice: "600",
+      totalPrice: "30000",
+      receivedQuantity: "50",
+      acceptedQuantity: "50",
+      rejectedQuantity: "0",
+      sortOrder: 1,
+    },
+  ]);
+
+  const procPOItems = await db.select().from(procurementPurchaseOrderItemsTable).orderBy(procurementPurchaseOrderItemsTable.id);
+
+  // Material Receipts
+  await db.insert(procurementMaterialReceiptsTable).values([
+    {
+      receiptNumber: "GRN-2026-0001",
+      poId: procPOs[0]!.id,
+      projectId: projects[0]!.id,
+      vendorId: vendors[3]!.id,
+      receivedDate: new Date("2026-05-07T10:15:00Z"),
+      receivedById: eng!.id,
+      deliveryNoteNumber: "RID-DN-2026-0428",
+      vehicleNumber: "MH-12-AB-1234",
+      driverName: "Ramesh Kumar",
+      driverContact: "+91 98765 12345",
+      remarks: "Material delivered in good condition. Some cartons had minor damage.",
+      attachmentUrls: ["uploads/grn-2026-0001-photo1.jpg", "uploads/grn-2026-0001-photo2.jpg"],
+    },
+  ]);
+
+  const procReceipts = await db.select().from(procurementMaterialReceiptsTable).orderBy(procurementMaterialReceiptsTable.id);
+
+  // Material Receipt Items
+  await db.insert(procurementMaterialReceiptItemsTable).values([
+    {
+      receiptId: procReceipts[0]!.id,
+      poItemId: procPOItems[0]!.id,
+      receivedQuantity: "12000",
+      remarks: "3 cartons with minor edge damage - sent for inspection",
+    },
+    {
+      receiptId: procReceipts[0]!.id,
+      poItemId: procPOItems[1]!.id,
+      receivedQuantity: "50",
+      remarks: "All gallons received in good condition",
+    },
+  ]);
+
+  const procReceiptItems = await db.select().from(procurementMaterialReceiptItemsTable).orderBy(procurementMaterialReceiptItemsTable.id);
+
+  // Quality Inspections
+  await db.insert(procurementQualityInspectionsTable).values([
+    {
+      inspectionNumber: "QI-2026-0001",
+      receiptId: procReceipts[0]!.id,
+      poId: procPOs[0]!.id,
+      projectId: projects[0]!.id,
+      inspectionDate: new Date("2026-05-07T14:00:00Z"),
+      inspectedById: eng!.id,
+      inspectorName: "Priya Iyer",
+      result: "partial_approved",
+      findings: "Overall material quality meets specifications. Minor defects found in 150 sqft tiles from damaged cartons.",
+      defectsFound: "Surface scratches and edge chipping on tiles from 3 damaged cartons. Approximately 150 sqft affected.",
+      recommendations: "Accept 11,850 sqft. Reject 150 sqft. Request replacement from vendor.",
+      photoUrls: ["uploads/qi-2026-0001-defect1.jpg", "uploads/qi-2026-0001-defect2.jpg"],
+      approvedById: pm!.id,
+      approvalDate: new Date("2026-05-07T16:00:00Z"),
+    },
+  ]);
+
+  const procInspections = await db.select().from(procurementQualityInspectionsTable).orderBy(procurementQualityInspectionsTable.id);
+
+  // Quality Inspection Items
+  await db.insert(procurementQualityInspectionItemsTable).values([
+    {
+      inspectionId: procInspections[0]!.id,
+      receiptItemId: procReceiptItems[0]!.id,
+      poItemId: procPOItems[0]!.id,
+      itemName: "Premium vinyl flooring tiles - Tarkett German",
+      receivedQuantity: "12000",
+      status: "partial_approved",
+      acceptedQuantity: "11850",
+      rejectedQuantity: "150",
+      qualityGrade: "A",
+      defectDescription: "Surface scratches and edge damage on 150 sqft from damaged cartons during transport",
+      remarks: "Approved 98.75% of received quantity. Vendor notified for replacement of rejected quantity.",
+      sortOrder: 0,
+    },
+    {
+      inspectionId: procInspections[0]!.id,
+      receiptItemId: procReceiptItems[1]!.id,
+      poItemId: procPOItems[1]!.id,
+      itemName: "Vinyl flooring adhesive - Bostik",
+      receivedQuantity: "50",
+      status: "approved",
+      acceptedQuantity: "50",
+      rejectedQuantity: "0",
+      qualityGrade: "A",
+      remarks: "All adhesive gallons passed inspection. Seals intact, no leakage.",
+      sortOrder: 1,
+    },
+  ]);
+
+  // Update PO status after inspection
+  await db.update(procurementPurchaseOrdersTable)
+    .set({ status: "inspected", actualDeliveryDate: "2026-05-07" })
+    .where(eqFilter(procurementPurchaseOrdersTable.id, procPOs[0]!.id));
+
+  // Inventory Items
+  await db.insert(procurementInventoryItemsTable).values([
+    {
+      itemCode: "INV-VIN-001",
+      projectId: projects[0]!.id,
+      itemName: "Premium vinyl flooring tiles - Tarkett",
+      description: "German brand, 12mm thickness, fire rated",
+      category: "Interior Materials",
+      unit: "sqft",
+      totalQuantity: "11850",
+      availableQuantity: "11850",
+      allocatedQuantity: "0",
+      consumedQuantity: "0",
+      minimumStock: "1000",
+      reorderLevel: "2000",
+      averageCost: "64",
+      lastPurchasePrice: "64",
+      lastPurchaseDate: "2026-05-07",
+      warehouseLocation: "Sentinel Site - Material Store A, Rack 12",
+      status: "active",
+    },
+    {
+      itemCode: "INV-ADH-001",
+      projectId: projects[0]!.id,
+      itemName: "Vinyl flooring adhesive - Bostik",
+      description: "Acrylic-based adhesive for vinyl flooring",
+      category: "Consumables",
+      unit: "gallon",
+      totalQuantity: "50",
+      availableQuantity: "50",
+      allocatedQuantity: "0",
+      consumedQuantity: "0",
+      minimumStock: "10",
+      reorderLevel: "15",
+      averageCost: "600",
+      lastPurchasePrice: "600",
+      lastPurchaseDate: "2026-05-07",
+      warehouseLocation: "Sentinel Site - Material Store A, Shelf 5",
+      status: "active",
+    },
+    {
+      itemCode: "INV-CEM-001",
+      projectId: projects[0]!.id,
+      itemName: "Cement - OPC 53 grade",
+      description: "Ordinary Portland Cement Grade 53",
+      category: "Civil Materials",
+      unit: "bag",
+      totalQuantity: "320",
+      availableQuantity: "140",
+      allocatedQuantity: "0",
+      consumedQuantity: "1240",
+      minimumStock: "200",
+      reorderLevel: "300",
+      averageCost: "385",
+      lastPurchasePrice: "390",
+      lastPurchaseDate: "2026-04-05",
+      warehouseLocation: "Sentinel Site - Open Storage Yard B",
+      status: "low_stock",
+    },
+    {
+      itemCode: "INV-STEEL-001",
+      projectId: projects[0]!.id,
+      itemName: "TMT steel bars 12mm",
+      description: "Thermo-mechanically treated steel reinforcement bars",
+      category: "Civil Materials",
+      unit: "kg",
+      totalQuantity: "1850",
+      availableQuantity: "950",
+      allocatedQuantity: "0",
+      consumedQuantity: "8200",
+      minimumStock: "2000",
+      reorderLevel: "3000",
+      averageCost: "62",
+      lastPurchasePrice: "64",
+      lastPurchaseDate: "2026-03-28",
+      warehouseLocation: "Sentinel Site - Open Storage Yard A",
+      status: "low_stock",
+    },
+    {
+      itemCode: "INV-DUCT-001",
+      projectId: projects[1]!.id,
+      itemName: "PVC conduit 25mm",
+      description: "PVC electrical conduit pipes",
+      category: "Electrical",
+      unit: "m",
+      totalQuantity: "640",
+      availableQuantity: "640",
+      allocatedQuantity: "0",
+      consumedQuantity: "5400",
+      minimumStock: "500",
+      reorderLevel: "800",
+      averageCost: "42",
+      lastPurchasePrice: "44",
+      lastPurchaseDate: "2026-03-15",
+      warehouseLocation: "Citygate Site - Store Room 2",
+      status: "active",
+    },
+  ]);
+
+  const procInventoryItems = await db.select().from(procurementInventoryItemsTable).orderBy(procurementInventoryItemsTable.id);
+
+  // Inventory Transactions
+  await db.insert(procurementInventoryTransactionsTable).values([
+    {
+      transactionNumber: "TXN-2026-0001",
+      inventoryItemId: procInventoryItems[0]!.id,
+      projectId: projects[0]!.id,
+      transactionType: "goods_receipt",
+      transactionDate: new Date("2026-05-07T16:30:00Z"),
+      quantity: "11850",
+      unitPrice: "64",
+      totalValue: "758400",
+      balanceQuantity: "11850",
+      poId: procPOs[0]!.id,
+      inspectionId: procInspections[0]!.id,
+      remarks: "Goods received and quality inspected. 150 sqft rejected.",
+      createdById: proc!.id,
+    },
+    {
+      transactionNumber: "TXN-2026-0002",
+      inventoryItemId: procInventoryItems[1]!.id,
+      projectId: projects[0]!.id,
+      transactionType: "goods_receipt",
+      transactionDate: new Date("2026-05-07T16:30:00Z"),
+      quantity: "50",
+      unitPrice: "600",
+      totalValue: "30000",
+      balanceQuantity: "50",
+      poId: procPOs[0]!.id,
+      inspectionId: procInspections[0]!.id,
+      remarks: "Goods received and quality approved",
+      createdById: proc!.id,
+    },
+    {
+      transactionNumber: "TXN-2026-0003",
+      inventoryItemId: procInventoryItems[2]!.id,
+      projectId: projects[0]!.id,
+      transactionType: "issue_to_project",
+      transactionDate: new Date("2026-04-15T08:00:00Z"),
+      quantity: "180",
+      unitPrice: "385",
+      totalValue: "69300",
+      balanceQuantity: "140",
+      taskId: 1,
+      remarks: "Issued to Floor 4 ceiling work",
+      createdById: eng!.id,
+    },
+  ]);
+
+  // Vendor Follow-ups
+  await db.insert(procurementVendorFollowUpsTable).values([
+    {
+      poId: procPOs[0]!.id,
+      vendorId: vendors[3]!.id,
+      followUpDate: new Date("2026-04-25T10:00:00Z"),
+      followUpType: "email",
+      followUpReason: "delivery_confirmation",
+      message: "Please confirm delivery schedule for PO-2026-0001. Expected date is May 7, 2026.",
+      response: "Delivery confirmed for May 7, 2026 between 10 AM - 12 PM.",
+      responseDate: new Date("2026-04-25T14:30:00Z"),
+      followUpById: proc!.id,
+      status: "responded",
+    },
+    {
+      poId: procPOs[0]!.id,
+      vendorId: vendors[3]!.id,
+      followUpDate: new Date("2026-05-08T09:00:00Z"),
+      followUpType: "phone",
+      followUpReason: "quality_issue",
+      message: "150 sqft tiles rejected due to transport damage. Requesting replacement as per warranty terms.",
+      response: "Replacement approved. Will dispatch by May 15, 2026.",
+      responseDate: new Date("2026-05-08T11:00:00Z"),
+      followUpById: proc!.id,
+      status: "responded",
+    },
+  ]);
+
+  // Procurement Notifications
+  await db.insert(procurementNotificationsTable).values([
+    {
+      userId: eng!.id,
+      notificationType: "material_request_approved",
+      title: "Material Request MR-2026-0001 Approved",
+      message: "Your material request for premium vinyl flooring has been approved by the manager.",
+      resourceType: "material_request",
+      resourceId: procMRs[0]!.id,
+      isRead: true,
+      readAt: new Date("2026-04-10T10:00:00Z"),
+      priority: "normal",
+    },
+    {
+      userId: eng!.id,
+      notificationType: "material_request_rejected",
+      title: "Material Request MR-2026-0003 Rejected",
+      message: "Your material request for copper wiring has been rejected. Reason: Budget constraints - Please revise specification to standard grade",
+      resourceType: "material_request",
+      resourceId: procMRs[2]!.id,
+      isRead: true,
+      readAt: new Date("2026-04-18T15:00:00Z"),
+      priority: "high",
+    },
+    {
+      userId: proc!.id,
+      notificationType: "rfq_created",
+      title: "New RFQ RFQ-2026-0001 Created",
+      message: "RFQ for premium vinyl flooring created from approved material request MR-2026-0001",
+      resourceType: "rfq",
+      resourceId: procRFQs[0]!.id,
+      isRead: true,
+      readAt: new Date("2026-04-11T10:30:00Z"),
+      priority: "normal",
+    },
+    {
+      userId: proc!.id,
+      notificationType: "quote_received",
+      title: "Quote Received for RFQ-2026-0001",
+      message: "Ridgeline Interiors has submitted a quote: ₹9,41,640",
+      resourceType: "vendor_quote",
+      resourceId: procQuotes[0]!.id,
+      isRead: true,
+      readAt: new Date("2026-04-15T15:00:00Z"),
+      priority: "normal",
+    },
+    {
+      userId: eng!.id,
+      notificationType: "po_issued",
+      title: "Purchase Order PO-2026-0001 Issued",
+      message: "PO issued to Ridgeline Interiors for vinyl flooring. Expected delivery: May 7, 2026",
+      resourceType: "purchase_order",
+      resourceId: procPOs[0]!.id,
+      isRead: true,
+      readAt: new Date("2026-04-19T12:00:00Z"),
+      priority: "normal",
+    },
+    {
+      userId: eng!.id,
+      notificationType: "material_delivered",
+      title: "Material Delivered - PO-2026-0001",
+      message: "Vinyl flooring materials have been delivered to Sentinel site. Please conduct quality inspection.",
+      resourceType: "material_receipt",
+      resourceId: procReceipts[0]!.id,
+      isRead: true,
+      readAt: new Date("2026-05-07T10:30:00Z"),
+      priority: "high",
+    },
+    {
+      userId: proc!.id,
+      notificationType: "inspection_completed",
+      title: "Quality Inspection Completed - QI-2026-0001",
+      message: "Quality inspection completed for vinyl flooring. Result: Partial Approved (11,850 sqft accepted, 150 sqft rejected)",
+      resourceType: "quality_inspection",
+      resourceId: procInspections[0]!.id,
+      isRead: true,
+      readAt: new Date("2026-05-07T16:30:00Z"),
+      priority: "normal",
+    },
+    {
+      userId: proc!.id,
+      notificationType: "quality_rejected",
+      title: "Partial Rejection - PO-2026-0001",
+      message: "150 sqft tiles rejected due to transport damage. Follow-up required with vendor for replacement.",
+      resourceType: "quality_inspection",
+      resourceId: procInspections[0]!.id,
+      isRead: false,
+      priority: "high",
+    },
+    {
+      userId: pm!.id,
+      notificationType: "material_request_pending",
+      title: "Material Request Pending Approval",
+      message: "Material request MR-2026-0002 for suspended ceiling tiles is awaiting your approval.",
+      resourceType: "material_request",
+      resourceId: procMRs[1]!.id,
+      isRead: false,
+      priority: "normal",
+    },
+    {
+      userId: proc!.id,
+      notificationType: "low_stock_alert",
+      title: "Low Stock Alert - Cement OPC 53",
+      message: "Cement stock is below minimum level. Current: 140 bags, Minimum: 200 bags. Please initiate procurement.",
+      resourceType: "inventory_item",
+      resourceId: procInventoryItems[2]!.id,
+      isRead: false,
+      priority: "urgent",
+    },
+    {
+      userId: proc!.id,
+      notificationType: "low_stock_alert",
+      title: "Low Stock Alert - TMT Steel Bars 12mm",
+      message: "TMT steel bars stock is below reorder level. Current: 950 kg, Reorder Level: 3000 kg.",
+      resourceType: "inventory_item",
+      resourceId: procInventoryItems[3]!.id,
+      isRead: false,
+      priority: "high",
+    },
+  ]);
+
+  logger.info("Procurement module seed data complete");
   logger.info("Seed complete");
 }
+
+
+

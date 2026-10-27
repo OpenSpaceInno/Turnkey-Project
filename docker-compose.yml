@@ -1,0 +1,75 @@
+services:
+  # ─── 1. MySQL 8 Database Service ──────────────────────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: turnkey-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-Hari@1212}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-turnkey_db}
+      MYSQL_USER: ${MYSQL_USER:-turnkey_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-TurnkeyPass2026!}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      # Automatically initialize all tables on initial database creation
+      - ./deploy/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    networks:
+      - turnkey-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-Hari@1212}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ─── 2. Backend Node.js API Service ───────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: turnkey-api
+    restart: always
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: mysql://${MYSQL_USER:-turnkey_user}:${MYSQL_PASSWORD:-TurnkeyPass2026!}@mysql:3306/${MYSQL_DATABASE:-turnkey_db}
+      SESSION_SECRET: ${SESSION_SECRET:-b72fa82e5b38d7c4912d8a4392f7ae8e47bfec99f0e1adbc62a3424cb45100a7fa06de48a0cbead28ea4e4cbef4ecbb547bf14e5904ef2c39db8c0a83350ea26}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost}
+    volumes:
+      - uploads_data:/app/uploads
+    networks:
+      - turnkey-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ─── 3. Frontend Web Service (Nginx) ──────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: turnkey-frontend
+    restart: always
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+    networks:
+      - turnkey-network
+
+volumes:
+  mysql_data:
+    driver: local
+  uploads_data:
+    driver: local
+
+networks:
+  turnkey-network:
+    driver: bridge

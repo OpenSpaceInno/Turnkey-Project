@@ -1,6 +1,15 @@
+import "dotenv/config";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { seedIfEmpty } from "./seed";
+import { startCronScheduler } from "./lib/cron-scheduler";
+
+process.on("uncaughtException", (err) => {
+  logger.error({ err }, "Uncaught Exception in process");
+});
+process.on("unhandledRejection", (reason) => {
+  logger.error({ reason }, "Unhandled Rejection in process");
+});
 
 const rawPort = process.env["PORT"];
 
@@ -19,6 +28,7 @@ if (Number.isNaN(port) || port <= 0) {
 async function main() {
   try {
     await seedIfEmpty();
+    startCronScheduler();
   } catch (err) {
     logger.error({ err }, "Seed failed");
   }

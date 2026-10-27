@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useListTasks, useListProjects, useUpdateTask, type Task } from "@workspace/api-client-react";
+import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -21,6 +23,26 @@ import {
   LayoutGrid,
   List as ListIcon,
   GanttChartSquare,
+  ArrowLeft,
+  Building2,
+  X,
+  Layers,
+  Rocket,
+  Compass,
+  ShoppingCart,
+  Building,
+  HardHat,
+  Zap,
+  Paintbrush,
+  ShieldCheck,
+  CheckCheck,
+  CheckCircle2,
+  Clock,
+  Circle,
+  ChevronDown,
+  ChevronRight,
+  Check,
+  AlertCircle,
 } from "lucide-react";
 import {
   format,
@@ -33,7 +55,7 @@ import {
 } from "date-fns";
 import { NewTaskDialog } from "@/components/dialogs/create-dialogs";
 
-type ViewMode = "board" | "list" | "gantt";
+type ViewMode = "phases" | "board" | "list" | "gantt";
 
 const STATUS_META: Record<
   string,
@@ -60,20 +82,17 @@ const STATUS_OPTIONS = [
 
 function StatusSelect({ task }: { task: Task }) {
   const qc = useQueryClient();
-  const { mutate, isPending } = useUpdateTask({
-    mutation: {
-      onSuccess: () => {
-        qc.invalidateQueries({ queryKey: ["/api/tasks"] });
-      },
-    },
-  });
+  const { mutate, isPending } = useUpdateTask();
 
   return (
     <Select
       value={task.status}
       disabled={isPending}
       onValueChange={(val) =>
-        mutate({ id: task.id, data: { status: val as Task["status"] } as any })
+        mutate(
+          { id: task.id, data: { status: val as Task["status"] } as any },
+          { onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/tasks"] }) }
+        )
       }
     >
       <SelectTrigger
@@ -98,39 +117,105 @@ function StatusSelect({ task }: { task: Task }) {
 }
 
 export default function Tasks() {
+  const [, setLocation] = useLocation();
   const { data: tasks, isLoading } = useListTasks();
   const { data: projects } = useListProjects();
   const [search, setSearch] = useState("");
   const [view, setView] = useState<ViewMode>(() => {
-    if (typeof window === "undefined") return "board";
-    const v = new URLSearchParams(window.location.search).get("view");
-    return v === "list" || v === "gantt" ? v : "board";
+    if (typeof window !== "undefined") {
+      const v = new URLSearchParams(window.location.search).get("view");
+      if (v === "phases" || v === "list" || v === "gantt" || v === "board") return v;
+      const p = new URLSearchParams(window.location.search).get("projectId");
+      if (p && p.trim() && p !== "all") return "phases";
+    }
+    return "phases";
   });
+
+  const [projectFilter, setProjectFilter] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search).get("projectId");
+      if (p && p.trim()) return p.trim();
+    }
+    return "all";
+  });
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  // Keep state updated if URL query parameters change (e.g. Back/Forward button)
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const pid = params.get("projectId");
+      setProjectFilter(pid && pid.trim() ? pid.trim() : "all");
+      const v = params.get("view");
+      if (v === "phases" || v === "list" || v === "gantt" || v === "board") {
+        setView(v as ViewMode);
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  // Sync view and projectFilter to URL query string
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (view === "board") params.delete("view");
-    else params.set("view", view);
+    if (view === "phases") {
+      params.set("view", "phases");
+    } else {
+      params.set("view", view);
+    }
+
+    if (projectFilter === "all") {
+      params.delete("projectId");
+    } else {
+      params.set("projectId", projectFilter);
+    }
+
     const qs = params.toString();
     const url = window.location.pathname + (qs ? `?${qs}` : "");
     window.history.replaceState(null, "", url);
-  }, [view]);
-  const [projectFilter, setProjectFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  }, [view, projectFilter]);
 
   const projectMap = useMemo(() => {
     const m = new Map<number, string>();
-    (projects ?? []).forEach(p => m.set(p.id, p.name));
+    const projectsArray = Array.isArray(projects) ? projects : [];
+    projectsArray.forEach(p => m.set(p.id, p.name));
     return m;
   }, [projects]);
 
+  const currentProject = useMemo(() => {
+    if (projectFilter === "all") return null;
+    const projectsArray = Array.isArray(projects) ? projects : [];
+    return projectsArray.find(p => String(p.id) === String(projectFilter)) || null;
+  }, [projects, projectFilter]);
+
+  const handleBack = () => {
+    const params = new URLSearchParams(window.location.search);
+    const from = params.get("from");
+    if (from && from.startsWith("/")) {
+      setLocation(decodeURIComponent(from));
+      return;
+    }
+    if (projectFilter !== "all") {
+      setLocation(`/projects/${projectFilter}?tab=journey`);
+      return;
+    }
+    setLocation("/projects");
+  };
+
   const filteredTasks = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return (tasks ?? []).filter(t => {
-      if (q && !(t.title.toLowerCase().includes(q) || (t.description ?? "").toLowerCase().includes(q))) {
+    const tasksArray = Array.isArray(tasks) ? tasks : [];
+    return tasksArray.filter(t => {
+      if (q && !(t.title?.toLowerCase().includes(q) || (t.description ?? "").toLowerCase().includes(q))) {
         return false;
       }
-      if (projectFilter !== "all" && String(t.projectId) !== projectFilter) return false;
-      if (statusFilter !== "all" && t.status !== statusFilter) return false;
+      // Strict project ID filtering: hide tasks from any other project
+      if (projectFilter !== "all" && String(t.projectId) !== String(projectFilter)) {
+        return false;
+      }
+      if (statusFilter !== "all" && t.status !== statusFilter) {
+        return false;
+      }
       return true;
     });
   }, [tasks, search, projectFilter, statusFilter]);
@@ -144,13 +229,46 @@ export default function Tasks() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Tasks</h1>
-          <p className="text-muted-foreground">Cross-project task management.</p>
-        </div>
-        <div className="flex items-center gap-2">
+        {projectFilter !== "all" ? (
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleBack}
+                className="gap-1.5 text-xs font-semibold h-7 px-2.5 shadow-xs border-primary/30 text-primary hover:bg-primary/10"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                Back to Lifecycle Map
+              </Button>
+              <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 text-xs px-2.5 py-0.5 font-semibold">
+                <Building2 className="h-3 w-3 mr-1 inline" />
+                Project #{projectFilter}
+              </Badge>
+              <Badge variant="secondary" className="text-xs">
+                WBS & Tasks Schedule
+              </Badge>
+            </div>
+            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">
+              {currentProject?.name ? `${currentProject.name} — WBS & Tasks` : "Project WBS & Tasks"}
+            </h1>
+            <p className="text-muted-foreground text-xs md:text-sm">
+              Work Breakdown Structure & execution schedule filtered strictly for this project.
+            </p>
+          </div>
+        ) : (
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Tasks</h1>
+            <p className="text-muted-foreground">Cross-project task management.</p>
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
           <Tabs value={view} onValueChange={v => setView(v as ViewMode)}>
             <TabsList>
+              <TabsTrigger value="phases" className="gap-1.5">
+                <Layers className="h-4 w-4" /> WBS Phases
+              </TabsTrigger>
               <TabsTrigger value="board" className="gap-1.5">
                 <LayoutGrid className="h-4 w-4" /> Board
               </TabsTrigger>
@@ -163,6 +281,7 @@ export default function Tasks() {
             </TabsList>
           </Tabs>
           <NewTaskDialog
+            defaultProjectId={projectFilter !== "all" ? Number(projectFilter) : undefined}
             trigger={
               <Button className="shrink-0 gap-2">
                 <Plus className="h-4 w-4" /> New Task
@@ -188,13 +307,25 @@ export default function Tasks() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All projects</SelectItem>
-            {(projects ?? []).map(p => (
+            {(Array.isArray(projects) ? projects : []).map(p => (
               <SelectItem key={p.id} value={String(p.id)}>
                 {p.name}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
+        {projectFilter !== "all" && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setProjectFilter("all")}
+            className="h-9 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground"
+            title="Clear project filter and view all projects"
+          >
+            <X className="h-3.5 w-3.5" />
+            Show All Projects
+          </Button>
+        )}
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-[160px]">
             <SelectValue placeholder="All statuses" />
@@ -216,6 +347,13 @@ export default function Tasks() {
         </div>
       </div>
 
+      {view === "phases" && (
+        <PhasesView
+          tasks={filteredTasks}
+          projectMap={projectMap}
+          projectId={projectFilter !== "all" ? Number(projectFilter) : undefined}
+        />
+      )}
       {view === "board" && (
         <BoardView tasks={filteredTasks} projectMap={projectMap} statuses={[...statuses]} />
       )}
@@ -580,6 +718,183 @@ function GanttView({
           </div>
         </div>
       </div>
+    </Card>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   WBS PHASES VIEW: FAMILIAR OVERVIEW TASKS LAYOUT & STRUCTURE
+   ══════════════════════════════════════════════════════════════════════ */
+
+function PhasesView({
+  tasks,
+  projectMap,
+  projectId,
+}: {
+  tasks: Task[];
+  projectMap: Map<number, string>;
+  projectId?: number;
+}) {
+  const [selectedPhase, setSelectedPhase] = useState<string>("all");
+
+  // Group tasks by their phase (same logic as Overview tasks, supporting module/phase segregation)
+  const phases: Record<string, Task[]> = {};
+  for (const t of tasks) {
+    const desc = t.description ?? "";
+    const m = desc.match(/^\[([^\]]+)\]/);
+    let phase = m ? m[1].trim() : "";
+
+    if (!phase) {
+      const text = `${t.title} ${desc}`.toLowerCase();
+      if (text.includes("initiat") || text.includes("mobiliz") || text.includes("kickoff") || text.includes("survey")) phase = "Initiation";
+      else if (text.includes("plan") || text.includes("permit") || text.includes("approval")) phase = "Planning";
+      else if (text.includes("design") || text.includes("drawing") || text.includes("gfc")) phase = "Design";
+      else if (text.includes("procure") || text.includes("purchase") || text.includes("long-lead") || text.includes("po ")) phase = "Procurement";
+      else if (text.includes("foundation") || text.includes("substructure") || text.includes("superstructure") || text.includes("slab") || text.includes("column") || text.includes("masonry") || text.includes("concrete") || text.includes("civil")) phase = "Civil & Structure";
+      else if (text.includes("mep") || text.includes("plumb") || text.includes("electric") || text.includes("hvac") || text.includes("sprinkler")) phase = "MEP";
+      else if (text.includes("finish") || text.includes("paint") || text.includes("floor") || text.includes("interior") || text.includes("plaster")) phase = "Finishing";
+      else if (text.includes("test") || text.includes("qc") || text.includes("snag") || text.includes("inspect")) phase = "QC & Testing";
+      else if (text.includes("close") || text.includes("handover") || text.includes("dlp")) phase = "Closeout";
+      else phase = "Other";
+    } else if (phase === "Execution") {
+      const text = `${t.title} ${desc}`.toLowerCase();
+      if (text.includes("foundation") || text.includes("substructure") || text.includes("superstructure") || text.includes("slab") || text.includes("column") || text.includes("masonry") || text.includes("concrete") || text.includes("civil")) {
+        phase = "Civil & Structure";
+      } else if (text.includes("mep") || text.includes("conduit") || text.includes("plumb") || text.includes("electric") || text.includes("hvac")) {
+        phase = "MEP";
+      } else if (text.includes("finish") || text.includes("paint") || text.includes("floor") || text.includes("interior") || text.includes("plaster")) {
+        phase = "Finishing";
+      }
+    }
+    (phases[phase] ??= []).push(t);
+  }
+
+  const standardPhaseOrder = [
+    "Initiation",
+    "Planning",
+    "Design",
+    "Procurement",
+    "Civil Works",
+    "Civil & Structure",
+    "Structure",
+    "Execution",
+    "MEP",
+    "Finishing",
+    "QC & Handover",
+    "QC & Testing",
+    "Closeout",
+    "Other",
+  ];
+  const presentPhases = Object.keys(phases);
+  const phaseOrder = [
+    ...standardPhaseOrder.filter(p => presentPhases.includes(p)),
+    ...presentPhases.filter(p => !standardPhaseOrder.includes(p)),
+  ];
+
+  const completed = tasks.filter(t => t.status === "completed").length;
+  const filteredPhaseOrder = selectedPhase === "all"
+    ? phaseOrder.filter(p => phases[p])
+    : phaseOrder.filter(p => p === selectedPhase && phases[p]);
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b">
+        <div>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Layers className="h-4 w-4 text-primary" />
+            Project Task Phases
+          </CardTitle>
+          <CardDescription>
+            {completed}/{tasks.length} tasks complete
+          </CardDescription>
+        </div>
+        {phaseOrder.filter(p => phases[p]).length > 1 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Button
+              variant={selectedPhase === "all" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedPhase("all")}
+              className="h-7 text-xs font-semibold px-2.5"
+            >
+              All Phases ({phaseOrder.filter(p => phases[p]).length})
+            </Button>
+            {phaseOrder.filter(p => phases[p]).map(p => {
+              const isSel = selectedPhase === p;
+              const count = phases[p]!.length;
+              const doneCount = phases[p]!.filter(t => t.status === "completed").length;
+              return (
+                <Button
+                  key={p}
+                  variant={isSel ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSelectedPhase(isSel ? "all" : p)}
+                  className="h-7 text-xs font-medium gap-1 px-2.5"
+                >
+                  <span>{p}</span>
+                  <span className={`text-[10px] ${isSel ? "text-primary-foreground/90 font-bold" : "text-muted-foreground"}`}>
+                    ({doneCount}/{count})
+                  </span>
+                </Button>
+              );
+            })}
+          </div>
+        )}
+      </CardHeader>
+      <CardContent className="space-y-6 pt-5">
+        {filteredPhaseOrder.map(phase => {
+          const items = phases[phase]!;
+          const done = items.filter(t => t.status === "completed").length;
+          return (
+            <div key={phase}>
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                  {phase}
+                </h4>
+                <span className="text-xs text-muted-foreground font-medium">{done}/{items.length}</span>
+              </div>
+              <div className="space-y-2">
+                {items.map(t => {
+                  const Icon = t.status === "completed" ? CheckCircle2 : t.status === "in_progress" ? Clock : Circle;
+                  const colour = t.status === "completed" ? "text-emerald-600" : t.status === "in_progress" ? "text-amber-600" : "text-muted-foreground";
+                  return (
+                    <div key={t.id} className="flex items-start gap-3 rounded-md border bg-background/50 hover:bg-muted/30 transition-colors px-3 py-2">
+                      <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${colour}`} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <div className="text-sm font-medium truncate">{t.title}</div>
+                          {t.priority && (
+                            <Badge variant={PRIORITY_VARIANT[t.priority]} className="text-[10px] px-1.5 py-0 h-4 capitalize">
+                              {t.priority}
+                            </Badge>
+                          )}
+                          {!projectId && (
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-normal text-muted-foreground">
+                              {projectMap.get(t.projectId) ?? `#${t.projectId}`}
+                            </Badge>
+                          )}
+                          {t.assignedToName && (
+                            <span className="text-xs text-muted-foreground">· {t.assignedToName}</span>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {t.startDate ? format(new Date(t.startDate), "MMM d") : "—"} → {t.endDate ? format(new Date(t.endDate), "MMM d, yyyy") : "—"}
+                        </div>
+                      </div>
+                      <StatusSelect task={t} />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+        {filteredPhaseOrder.length === 0 && (
+          <div className="p-8 text-center text-muted-foreground text-sm">
+            No tasks found matching your filters.
+          </div>
+        )}
+      </CardContent>
     </Card>
   );
 }

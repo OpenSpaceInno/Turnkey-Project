@@ -29,19 +29,19 @@ export interface UpdateUserInput {
 // ---------------------------------------------------------------------------
 
 export const createUser = (data: CreateUserInput): Promise<User> =>
-  customFetch<User>("/users", {
+  customFetch<User>("/api/users", {
     method: "POST",
     body: JSON.stringify(data),
   });
 
 export const updateUser = (id: number, data: UpdateUserInput): Promise<User> =>
-  customFetch<User>(`/users/${id}`, {
+  customFetch<User>(`/api/users/${id}`, {
     method: "PATCH",
     body: JSON.stringify(data),
   });
 
 export const deleteUser = (id: number): Promise<void> =>
-  customFetch<void>(`/users/${id}`, { method: "DELETE" });
+  customFetch<void>(`/api/users/${id}`, { method: "DELETE" });
 
 // ---------------------------------------------------------------------------
 // React Query hooks
@@ -69,5 +69,43 @@ export const useDeleteUser = () => {
   return useMutation({
     mutationFn: (id: number) => deleteUser(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["listUsers"] }),
+  });
+};
+
+// Switch Role
+export interface SwitchRoleInput {
+  role: string;
+}
+
+export const switchRole = (data: SwitchRoleInput): Promise<User> =>
+  customFetch<User>("/api/auth/switch-role", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+
+export const useSwitchRole = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: SwitchRoleInput) => switchRole(data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/auth/me"] }),
+  });
+};
+
+// Logout
+export const logout = (): Promise<{ message: string }> =>
+  customFetch<{ message: string }>("/api/auth/logout", {
+    method: "POST",
+  });
+
+export const useLogout = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => logout(),
+    onSuccess: () => {
+      // Clear all cached data
+      qc.clear();
+      // Redirect to login page
+      window.location.href = "/login";
+    },
   });
 };

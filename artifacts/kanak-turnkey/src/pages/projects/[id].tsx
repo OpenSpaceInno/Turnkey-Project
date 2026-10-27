@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -25,11 +25,14 @@ import {
   useCreateRaBill,
   useCreateStakeholder,
   useCreateDocument,
+  usePermissions,
+  PERMISSIONS,
   type RaBill,
   type Stakeholder,
   type PunchListItem,
   type Task,
 } from "@workspace/api-client-react";
+import { PermissionGate, MaskedFinancialValue, AccessDeniedView } from "@/components/auth/permission-gate";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -48,25 +51,45 @@ import {
   ChevronLeft, Plus, FileText, CheckCircle2, Circle, Clock,
   AlertCircle, CheckCheck, ArrowRight, ClipboardList, LayoutTemplate,
   Eye, Pencil, Printer, MessageSquare, Camera, Upload, X, Send,
+  Compass, Sparkles,
 } from "lucide-react";
 import { format } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
+import { ProjectJourneyView } from "./project-journey";
+import { ProjectCommercialControl } from "@/components/project/project-commercial-control";
+import { ProjectVendorsTab } from "@/components/project/project-vendors-tab";
+import { ProjectExecutionTab } from "@/components/project/project-execution-tab";
+import { ProjectProcurementTab } from "@/components/project/project-procurement-tab";
+import { ProjectGanttChart } from "@/components/project/project-gantt-chart";
+import { ProjectBudgetTab } from "@/components/project/project-budget-tab";
 
-// ── Project lifecycle stages ──────────────────────────────────────────────────
-const LIFECYCLE = [
-  { key: "planning",    label: "Planning",    desc: "Project scoping & design" },
-  { key: "procurement", label: "Procurement", desc: "Material sourcing & POs" },
-  { key: "execution",   label: "Execution",   desc: "On-site works in progress" },
-  { key: "qc",          label: "QC & Testing",desc: "Quality checks & punch list" },
-  { key: "handover",    label: "Handover",    desc: "Client handover & acceptance" },
-  { key: "archived",    label: "Archived",    desc: "Project closed" },
+// ── Turnkey 4-Phase Governed Delivery ─────────────────────────────────────────
+const TURNKEY_PHASES = [
+  {
+    phaseId: 1,
+    label: "1. Planning & Setup",
+    desc: "Mobilization, WBS & Budget",
+    targetTab: "journey",
+  },
+  {
+    phaseId: 2,
+    label: "2. Procurement & Sourcing",
+    desc: "Material RFQs, POs & Delivery",
+    targetTab: "procurement",
+  },
+  {
+    phaseId: 3,
+    label: "3. Site Execution & JMR",
+    desc: "Subcontracts & JMR Sheets",
+    targetTab: "execution",
+  },
+  {
+    phaseId: 4,
+    label: "4. Billing & Handover",
+    desc: "RA Bills, Invoices & VCC",
+    targetTab: "commercial",
+  },
 ] as const;
-
-type Stage = typeof LIFECYCLE[number]["key"];
-
-function nextStage(current: string): Stage | null {
-  const idx = LIFECYCLE.findIndex(s => s.key === current);
-  return idx >= 0 && idx < LIFECYCLE.length - 1 ? LIFECYCLE[idx + 1]!.key : null;
-}
 
 // ── Punch list status / priority meta ────────────────────────────────────────
 const PL_STATUS: Record<string, { label: string; dot: string; badge: "default" | "secondary" | "outline" | "destructive" }> = {
@@ -91,17 +114,18 @@ const TASK_STATUS_OPTIONS = [
 
 function TaskStatusSelect({ task, projectId }: { task: Task; projectId: number }) {
   const qc = useQueryClient();
-  const { mutate, isPending } = useUpdateTask({
-    mutation: {
-      onSuccess: () => qc.invalidateQueries({ queryKey: getListTasksQueryKey({ projectId }) }),
-    },
-  });
+  const { mutate, isPending } = useUpdateTask();
   const dot = TASK_STATUS_OPTIONS.find(o => o.value === task.status)?.dot ?? "bg-muted-foreground";
   return (
     <Select
       value={task.status}
       disabled={isPending}
-      onValueChange={(val) => mutate({ id: task.id, data: { status: val as Task["status"] } as any })}
+      onValueChange={(val) =>
+        mutate(
+          { id: task.id, data: { status: val as Task["status"] } as any },
+          { onSuccess: () => qc.invalidateQueries({ queryKey: (getListTasksQueryKey as any)({ projectId }) }) }
+        )
+      }
     >
       <SelectTrigger
         className="h-7 text-xs px-2 gap-1 w-[120px]"
@@ -128,13 +152,15 @@ export default function ProjectDetail() {
   const { id } = useParams();
   const projectId = parseInt(id || "0", 10);
   const qc = useQueryClient();
+  const { toast } = useToast();
+  const { activeRole, canViewFinancials, isAdmin } = usePermissions();
 
   const { data: project, isLoading } = useGetProject(projectId, {
     query: { enabled: !!projectId, queryKey: getGetProjectQueryKey(projectId) },
   });
 
   const enabled = !!projectId;
-  const { data: tasks }        = useListTasks({ projectId }, { query: { enabled, queryKey: getListTasksQueryKey({ projectId }) } });
+  const { data: tasks, refetch: refetchTasks } = useListTasks({ projectId }, { query: { enabled, queryKey: (getListTasksQueryKey as any)({ projectId }) } });
   const { data: budgetItems }  = useListBudgetItems(projectId, { query: { enabled, queryKey: getListBudgetItemsQueryKey(projectId) } });
   const { data: raBills }      = useListRaBills({ projectId }, { query: { enabled, queryKey: getListRaBillsQueryKey({ projectId }) } });
   const { data: stakeholders } = useListStakeholders({ projectId }, { query: { enabled, queryKey: getListStakeholdersQueryKey({ projectId }) } });
@@ -145,8 +171,26 @@ export default function ProjectDetail() {
   const createPunch    = useCreatePunchListItem();
   const updatePunch    = useUpdatePunchListItem();
 
-  const [activeTab, setActiveTab] = useState("overview");
-  const [advanceOpen, setAdvanceOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState(() => {
+    const tabParam = new URLSearchParams(window.location.search).get("tab");
+    if (tabParam === "team") return "journey";
+    return tabParam || "journey";
+  });
+
+  useEffect(() => {
+    const tabParam = new URLSearchParams(window.location.search).get("tab");
+    if (tabParam === "team") {
+      setActiveTab("journey");
+      setTimeout(() => {
+        const el = document.getElementById("project-team-section");
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          el.classList.add("ring-4", "ring-primary/40", "shadow-xl", "rounded-xl", "transition-all", "duration-500");
+          setTimeout(() => el.classList.remove("ring-4", "ring-primary/40", "shadow-xl"), 2500);
+        }
+      }, 350);
+    }
+  }, []);
   const [punchOpen, setPunchOpen] = useState(false);
   const [punchForm, setPunchForm] = useState({ title: "", description: "", category: "general", priority: "medium", dueDate: "" });
   const [applyOpen, setApplyOpen] = useState(false);
@@ -202,12 +246,28 @@ export default function ProjectDetail() {
   // ── Upload Document ───────────────────────────────────────────────────────
   const [uploadDocOpen, setUploadDocOpen] = useState(false);
   const [docForm, setDocForm] = useState({ fileName: "", category: "general", fileType: "", fileUrl: "" });
+  const [selectedDocFiles, setSelectedDocFiles] = useState<File[]>([]);
   const createDocument = useCreateDocument();
 
   if (isLoading) return <div className="p-6">Loading project details...</div>;
   if (!project)  return <div className="p-6 text-destructive">Project not found</div>;
 
-  const projectTasks        = tasks?.filter(t => t.projectId === projectId) || [];
+  // Deduplicate tasks by title and projectId
+  const uniqueTasksMap = new Map<string, Task>();
+  for (const t of tasks || []) {
+    if (t.projectId === projectId) {
+      const key = t.title.trim().toLowerCase();
+      if (uniqueTasksMap.has(key)) {
+        const existing = uniqueTasksMap.get(key)!;
+        if (existing.status === "todo" && t.status !== "todo") {
+          uniqueTasksMap.set(key, t);
+        }
+      } else {
+        uniqueTasksMap.set(key, t);
+      }
+    }
+  }
+  const projectTasks        = Array.from(uniqueTasksMap.values());
   const projectBudget       = budgetItems?.filter(b => b.projectId === projectId) || [];
   const projectRaBills      = raBills?.filter(r => r.projectId === projectId) || [];
   const projectStakeholders = stakeholders?.filter(s => s.projectId === projectId) || [];
@@ -216,16 +276,6 @@ export default function ProjectDetail() {
 
   const openPunch     = projectPunch.filter(p => p.status === "open" || p.status === "in_progress").length;
   const resolvedPunch = projectPunch.filter(p => p.status === "resolved" || p.status === "closed").length;
-
-  const currentStageIdx = LIFECYCLE.findIndex(s => s.key === project.status);
-  const next = nextStage(project.status);
-
-  const handleAdvance = async () => {
-    if (!next) return;
-    await updateProject.mutateAsync({ id: projectId, data: { name: project.name, status: next } });
-    await qc.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) });
-    setAdvanceOpen(false);
-  };
 
   const handleCreatePunch = async () => {
     if (!punchForm.title.trim()) return;
@@ -251,13 +301,198 @@ export default function ProjectDetail() {
 
   const handleApplyTemplate = async () => {
     if (!selectedTemplateId) return;
-    await applyTemplate.mutateAsync({
-      id: parseInt(selectedTemplateId),
-      data: { projectId, startDate: applyStartDate || null },
-    });
-    await qc.invalidateQueries({ queryKey: getListTasksQueryKey({ projectId }) });
-    setApplyOpen(false);
-    setSelectedTemplateId("");
+    try {
+      const res = await applyTemplate.mutateAsync({
+        id: parseInt(selectedTemplateId),
+        data: { projectId, startDate: applyStartDate || null },
+      });
+      await qc.invalidateQueries({ queryKey: (getListTasksQueryKey as any)({ projectId }) });
+      await qc.invalidateQueries({ queryKey: ["/api/tasks"] });
+      await refetchTasks();
+      setApplyOpen(false);
+      setSelectedTemplateId("");
+      toast({
+        title: "Task Template Applied!",
+        description: `Successfully generated ${(res as any)?.tasksCreated ?? 26} tasks for this project.`,
+      });
+    } catch (err: any) {
+      toast({
+        title: "Failed to Apply Template",
+        description: err.message || "An error occurred while generating tasks.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCreateTask = async () => {
+    if (!taskForm.title.trim()) return;
+    try {
+      await createTask.mutateAsync({
+        data: {
+          projectId,
+          title: taskForm.title.trim(),
+          description: taskForm.description || null,
+          priority: taskForm.priority as "high" | "medium" | "low",
+          startDate: taskForm.startDate || null,
+          endDate: taskForm.endDate || null,
+        },
+      });
+      await qc.invalidateQueries({ queryKey: getListTasksQueryKey({ projectId }) });
+      await qc.invalidateQueries({ queryKey: ["/api/tasks"] });
+      await refetchTasks();
+      setAddTaskOpen(false);
+      setTaskForm({ title: "", description: "", priority: "medium", startDate: "", endDate: "" });
+      toast({ title: "Task Added", description: `Task "${taskForm.title}" created successfully.` });
+    } catch (err: any) {
+      toast({ title: "Failed to add task", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleCreateBudgetItem = async () => {
+    if (!budgetForm.costCode.trim() || !budgetForm.description.trim() || !budgetForm.budgeted) return;
+    try {
+      await createBudgetItem.mutateAsync({
+        data: {
+          projectId,
+          costCode: budgetForm.costCode.trim(),
+          description: budgetForm.description.trim(),
+          budgeted: String(budgetForm.budgeted),
+          committed: String(budgetForm.committed || 0),
+          actual: String(budgetForm.actual || 0),
+        },
+      });
+      await qc.invalidateQueries({ queryKey: getListBudgetItemsQueryKey(projectId) });
+      await qc.invalidateQueries({ queryKey: ["/api/budget-items"] });
+      setAddBudgetOpen(false);
+      setBudgetForm({ costCode: "", description: "", budgeted: "", actual: "0", committed: "0" });
+      toast({ title: "Budget Item Added", description: `Budget code ${budgetForm.costCode} added successfully.` });
+    } catch (err: any) {
+      toast({ title: "Failed to add budget item", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleCreateRaBill = async () => {
+    if (!billForm.billNumber.trim() || !billForm.amount) return;
+    try {
+      await createRaBill.mutateAsync({
+        data: {
+          projectId,
+          billNumber: billForm.billNumber.trim(),
+          amount: String(billForm.amount),
+          milestone: billForm.milestone || null,
+          description: billForm.description || null,
+        },
+      });
+      await qc.invalidateQueries({ queryKey: getListRaBillsQueryKey({ projectId }) });
+      await qc.invalidateQueries({ queryKey: ["/api/ra-bills"] });
+      setCreateBillOpen(false);
+      setBillForm({ billNumber: "", description: "", amount: "", milestone: "" });
+      toast({ title: "RA Bill Created", description: `Bill ${billForm.billNumber} created successfully.` });
+    } catch (err: any) {
+      toast({ title: "Failed to create RA bill", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleCreateStakeholder = async () => {
+    if (!newShForm.name.trim()) return;
+    try {
+      await createStakeholder.mutateAsync({
+        data: {
+          projectId,
+          name: newShForm.name.trim(),
+          email: newShForm.email || null,
+          phone: newShForm.phone || null,
+          organization: newShForm.organization || null,
+          role: newShForm.role || null,
+          accessLevel: newShForm.accessLevel || "read",
+        },
+      });
+      await qc.invalidateQueries({ queryKey: getListStakeholdersQueryKey({ projectId }) });
+      await qc.invalidateQueries({ queryKey: ["/api/stakeholders"] });
+      setAddStakeholderOpen(false);
+      setNewShForm({ name: "", email: "", phone: "", organization: "", role: "", accessLevel: "read" });
+      toast({ title: "Stakeholder Added", description: `${newShForm.name} added to project stakeholders.` });
+    } catch (err: any) {
+      toast({ title: "Failed to add stakeholder", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleSaveStakeholder = async () => {
+    if (!editingStakeholder || !shForm.name.trim()) return;
+    try {
+      await updateStakeholder.mutateAsync({
+        id: editingStakeholder.id,
+        data: {
+          name: shForm.name.trim(),
+          email: shForm.email || null,
+          phone: shForm.phone || null,
+          organization: shForm.organization || null,
+          role: shForm.role || null,
+          accessLevel: shForm.accessLevel || "read",
+        },
+      });
+      await qc.invalidateQueries({ queryKey: getListStakeholdersQueryKey({ projectId }) });
+      await qc.invalidateQueries({ queryKey: ["/api/stakeholders"] });
+      setEditingStakeholder(null);
+      toast({ title: "Stakeholder Updated", description: "Changes saved successfully." });
+    } catch (err: any) {
+      toast({ title: "Failed to update stakeholder", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleCreateDocument = async () => {
+    if (!docForm.fileName.trim()) return;
+    try {
+      let fileUrl = docForm.fileUrl ? docForm.fileUrl.trim() : "";
+      let fileSize: number | null = null;
+      let fileType = docForm.fileType ? docForm.fileType.trim() : "pdf";
+
+      // If files were selected, upload the first file to /api/upload
+      if (selectedDocFiles.length > 0) {
+        try {
+          const file = selectedDocFiles[0];
+          fileSize = file.size;
+          fileType = docForm.fileType || file.name.split(".").pop() || "pdf";
+
+          const formData = new FormData();
+          formData.append("file", file);
+
+          const uploadResponse = await fetch("/api/upload", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (uploadResponse.ok) {
+            const uploadData = await uploadResponse.json();
+            fileUrl = uploadData.fileUrl;
+            if (uploadData.fileType) fileType = uploadData.fileType;
+          }
+        } catch (uploadErr) {
+          console.error("File upload error:", uploadErr);
+        }
+      }
+
+      await createDocument.mutateAsync({
+        data: {
+          projectId,
+          fileName: docForm.fileName.trim(),
+          name: docForm.fileName.trim(),
+          category: docForm.category || "general",
+          fileType: fileType || "pdf",
+          fileSize: fileSize ?? null,
+          fileUrl: fileUrl || "/placeholder-doc.pdf",
+        },
+      });
+      await qc.invalidateQueries({ queryKey: getListDocumentsQueryKey({ projectId }) });
+      await qc.invalidateQueries({ queryKey: ["/api/documents"] });
+      await qc.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) });
+      setUploadDocOpen(false);
+      setDocForm({ fileName: "", category: "general", fileType: "", fileUrl: "" });
+      setSelectedDocFiles([]);
+      toast({ title: "Document Uploaded", description: `Document "${docForm.fileName}" registered successfully.` });
+    } catch (err: any) {
+      toast({ title: "Failed to upload document", description: err.message, variant: "destructive" });
+    }
   };
 
   // ── RA Bill print ─────────────────────────────────────────────────────────
@@ -328,23 +563,6 @@ export default function ProjectDetail() {
     });
   };
 
-  const handleSaveStakeholder = async () => {
-    if (!editingStakeholder || !shForm.name.trim()) return;
-    await updateStakeholder.mutateAsync({
-      id: editingStakeholder.id,
-      data: {
-        name: shForm.name,
-        email: shForm.email || null,
-        phone: shForm.phone || null,
-        organization: shForm.organization || null,
-        role: shForm.role || null,
-        accessLevel: shForm.accessLevel as "read" | "write" | "admin",
-      },
-    });
-    await qc.invalidateQueries({ queryKey: getListStakeholdersQueryKey({ projectId }) });
-    setEditingStakeholder(null);
-  };
-
   // ── Punch list photo upload ───────────────────────────────────────────────
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!detailItem || !e.target.files?.length) return;
@@ -381,139 +599,38 @@ export default function ProjectDetail() {
     setCommentText("");
   };
 
-  // ── Create Task ───────────────────────────────────────────────────────────
-  const handleCreateTask = async () => {
-    if (!taskForm.title.trim()) return;
-    await createTask.mutateAsync({
-      data: {
-        projectId,
-        title: taskForm.title,
-        description: taskForm.description || null,
-        priority: taskForm.priority as "low" | "medium" | "high",
-        status: "todo",
-        startDate: taskForm.startDate || null,
-        endDate: taskForm.endDate || null,
-      },
-    });
-    await qc.invalidateQueries({ queryKey: getListTasksQueryKey({ projectId }) });
-    setAddTaskOpen(false);
-    setTaskForm({ title: "", description: "", priority: "medium", startDate: "", endDate: "" });
-  };
-
-  // ── Create Budget Item ────────────────────────────────────────────────────
-  const handleCreateBudgetItem = async () => {
-    if (!budgetForm.costCode.trim() || !budgetForm.description.trim() || !budgetForm.budgeted) return;
-    await createBudgetItem.mutateAsync({
-      projectId,
-      data: {
-        costCode: budgetForm.costCode,
-        description: budgetForm.description,
-        budgeted: parseFloat(budgetForm.budgeted),
-        actual: parseFloat(budgetForm.actual) || 0,
-        committed: parseFloat(budgetForm.committed) || 0,
-      },
-    });
-    await qc.invalidateQueries({ queryKey: getListBudgetItemsQueryKey(projectId) });
-    setAddBudgetOpen(false);
-    setBudgetForm({ costCode: "", description: "", budgeted: "", actual: "0", committed: "0" });
-  };
-
-  // ── Create RA Bill ────────────────────────────────────────────────────────
-  const handleCreateRaBill = async () => {
-    if (!billForm.billNumber.trim() || !billForm.amount) return;
-    await createRaBill.mutateAsync({
-      data: {
-        projectId,
-        billNumber: billForm.billNumber,
-        description: billForm.description || null,
-        amount: parseFloat(billForm.amount),
-        milestone: billForm.milestone || null,
-      },
-    });
-    await qc.invalidateQueries({ queryKey: getListRaBillsQueryKey({ projectId }) });
-    setCreateBillOpen(false);
-    setBillForm({ billNumber: "", description: "", amount: "", milestone: "" });
-  };
-
-  // ── Create Stakeholder ────────────────────────────────────────────────────
-  const handleCreateStakeholder = async () => {
-    if (!newShForm.name.trim()) return;
-    await createStakeholder.mutateAsync({
-      data: {
-        projectId,
-        name: newShForm.name,
-        email: newShForm.email || null,
-        phone: newShForm.phone || null,
-        organization: newShForm.organization || null,
-        role: newShForm.role || null,
-        accessLevel: newShForm.accessLevel as "read" | "write" | "admin",
-      },
-    });
-    await qc.invalidateQueries({ queryKey: getListStakeholdersQueryKey({ projectId }) });
-    setAddStakeholderOpen(false);
-    setNewShForm({ name: "", email: "", phone: "", organization: "", role: "", accessLevel: "read" });
-  };
-
-  // ── Create Document ───────────────────────────────────────────────────────
-  const handleCreateDocument = async () => {
-    if (!docForm.fileName.trim()) return;
-    await createDocument.mutateAsync({
-      data: {
-        projectId,
-        fileName: docForm.fileName,
-        fileType: docForm.fileType || null,
-        fileUrl: docForm.fileUrl || null,
-        category: docForm.category as "general" | "contract" | "drawing" | "report" | "other",
-      },
-    });
-    await qc.invalidateQueries({ queryKey: getListDocumentsQueryKey({ projectId }) });
-    setUploadDocOpen(false);
-    setDocForm({ fileName: "", category: "general", fileType: "", fileUrl: "" });
-  };
-
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
-          <Link href="/projects"><ChevronLeft className="h-5 w-5" /></Link>
-        </Button>
-        <div className="flex-1">
-          <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl font-bold tracking-tight">{project.name}</h1>
-            <Badge variant={project.status === "archived" ? "outline" : project.status === "handover" ? "default" : "secondary"} className="capitalize">
-              {project.status.replace("_", " ")}
-            </Badge>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" asChild className="shrink-0">
+            <Link href="/projects"><ChevronLeft className="h-5 w-5" /></Link>
+          </Button>
+          <div>
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h1 className="text-2xl font-bold tracking-tight">{project.name}</h1>
+              <Badge variant={project.status === "archived" ? "outline" : project.status === "handover" ? "default" : "secondary"} className="capitalize text-xs">
+                {project.status.replace("_", " ")}
+              </Badge>
+              <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 text-xs font-semibold">
+                <Sparkles className="h-3 w-3 mr-1 inline" /> 4-Phase Turnkey
+              </Badge>
+            </div>
+            <p className="text-muted-foreground text-xs md:text-sm mt-0.5">
+              Client: <strong className="text-foreground">{project.clientName}</strong> &bull; Location: {project.location || "Mumbai"}
+            </p>
           </div>
-          <p className="text-muted-foreground">{project.clientName} • {project.location}</p>
         </div>
-        {next && (
-          <Dialog open={advanceOpen} onOpenChange={setAdvanceOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2 shrink-0">
-                <ArrowRight className="h-4 w-4" />
-                Advance to {LIFECYCLE.find(s => s.key === next)?.label}
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Advance Project Stage</DialogTitle>
-                <DialogDescription>
-                  Move this project from <strong>{LIFECYCLE[currentStageIdx]?.label}</strong> to{" "}
-                  <strong>{LIFECYCLE.find(s => s.key === next)?.label}</strong>?
-                  {next === "handover" && <span className="block mt-2 text-amber-600 text-sm">Ensure all punch list items are resolved before proceeding to handover.</span>}
-                  {next === "archived" && <span className="block mt-2 text-muted-foreground text-sm">This will archive the project. Final financial closure should be complete.</span>}
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setAdvanceOpen(false)}>Cancel</Button>
-                <Button onClick={handleAdvance} disabled={updateProject.isPending}>
-                  {updateProject.isPending ? "Updating..." : "Confirm"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        )}
+
+        <Button
+          variant={activeTab === "journey" ? "default" : "outline"}
+          className="gap-2 shrink-0 border-primary/40 bg-primary/5 hover:bg-primary/10 text-primary font-semibold data-[state=active]:bg-primary shadow-xs"
+          onClick={() => setActiveTab("journey")}
+        >
+          <Sparkles className="h-4 w-4" />
+          End-to-End Lifecycle Map
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -537,7 +654,9 @@ export default function ProjectDetail() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Budget</span>
-                  <span className="font-medium">{project.budget ? INR.format(project.budget) : "TBD"}</span>
+                  <span className="font-medium">
+                    <MaskedFinancialValue value={project.budget} />
+                  </span>
                 </div>
                 {project.startDate && (
                   <div className="flex justify-between">
@@ -555,43 +674,71 @@ export default function ProjectDetail() {
             </CardContent>
           </Card>
 
-          {/* ── Lifecycle Stage Stepper ── */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm">Project Lifecycle</CardTitle>
+          {/* ── Turnkey 4-Phase Governed Delivery Stepper ── */}
+          <Card className="border shadow-sm">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-sm font-bold flex items-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5 text-primary" /> Turnkey Lifecycle
+                </CardTitle>
+                <CardDescription className="text-[11px]">
+                  4 Governed Milestone Phases
+                </CardDescription>
+              </div>
+              <Badge variant="outline" className="text-[10px] bg-primary/5 text-primary border-primary/20 font-semibold">
+                Workflow
+              </Badge>
             </CardHeader>
             <CardContent className="px-4 pb-4">
-              <ol className="space-y-0">
-                {LIFECYCLE.map((stage, i) => {
-                  const done    = i < currentStageIdx;
-                  const current = i === currentStageIdx;
-                  const future  = i > currentStageIdx;
+              <ol className="space-y-1">
+                {TURNKEY_PHASES.map((stage, i) => {
+                  const isCurrentTab = activeTab === stage.targetTab;
                   return (
-                    <li key={stage.key} className="flex gap-3">
+                    <li
+                      key={stage.phaseId}
+                      className={`flex gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
+                        isCurrentTab ? "bg-primary/10 border border-primary/20" : "hover:bg-muted/40"
+                      }`}
+                      onClick={() => {
+                        if (stage.phaseId === 1) {
+                          setActiveTab("journey");
+                        } else {
+                          setActiveTab(stage.targetTab);
+                        }
+                      }}
+                    >
                       <div className="flex flex-col items-center">
-                        <div className={`h-6 w-6 rounded-full flex items-center justify-center shrink-0 text-[11px] font-bold
-                          ${done    ? "bg-primary text-primary-foreground" : ""}
-                          ${current ? "bg-amber-500 text-white ring-2 ring-amber-500/30" : ""}
-                          ${future  ? "bg-muted text-muted-foreground" : ""}
-                        `}>
-                          {done ? <CheckCheck className="h-3.5 w-3.5" /> : i + 1}
+                        <div className={`h-6 w-6 rounded-full flex items-center justify-center shrink-0 text-[11px] font-bold ${
+                          isCurrentTab ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary"
+                        }`}>
+                          {stage.phaseId}
                         </div>
-                        {i < LIFECYCLE.length - 1 && (
-                          <div className={`w-0.5 flex-1 my-1 min-h-[12px] ${done ? "bg-primary" : "bg-border"}`} />
+                        {i < TURNKEY_PHASES.length - 1 && (
+                          <div className="w-0.5 flex-1 my-1 min-h-[14px] bg-border" />
                         )}
                       </div>
-                      <div className="pb-3 min-w-0">
-                        <div className={`text-xs font-semibold leading-6 ${current ? "text-amber-600" : done ? "text-foreground" : "text-muted-foreground"}`}>
+                      <div className="min-w-0 pb-1">
+                        <div className="text-xs font-semibold leading-tight text-foreground">
                           {stage.label}
                         </div>
-                        {(current || done) && (
-                          <div className="text-[10px] text-muted-foreground leading-tight">{stage.desc}</div>
-                        )}
+                        <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{stage.desc}</div>
                       </div>
                     </li>
                   );
                 })}
               </ol>
+
+              <div className="pt-3 border-t mt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-xs font-semibold h-8 gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+                  onClick={() => setActiveTab("journey")}
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Open Full Journey Map
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -599,179 +746,50 @@ export default function ProjectDetail() {
         {/* Main tabs */}
         <div className="md:col-span-3">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent flex-wrap">
+            <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent flex-wrap gap-1">
               {[
-                { value: "overview",      label: "Overview" },
-                { value: "tasks",         label: `Tasks (${projectTasks.length})` },
-                { value: "punchlist",     label: `Punch List (${openPunch} open)` },
-                { value: "budget",        label: `Budget (${projectBudget.length})` },
-                { value: "rabills",       label: `RA Bills (${projectRaBills.length})` },
-                { value: "stakeholders",  label: `Stakeholders (${projectStakeholders.length})` },
-                { value: "documents",     label: `Documents (${projectDocs.length})` },
-              ].map(t => (
-                <TabsTrigger key={t.value} value={t.value}
-                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-sm">
-                  {t.label}
-                </TabsTrigger>
-              ))}
+                { value: "journey",       label: "🚀 Turnkey Lifecycle Map", show: true },
+                { value: "procurement",   label: "🛒 Procurement & Supply", show: isAdmin || activeRole === "project_manager" || activeRole === "procurement_officer" || activeRole === "engineer" },
+                { value: "execution",     label: "🏗️ Execution & Measurement", show: true },
+                { value: "commercial",    label: "💰 Commercial & Finance", show: canViewFinancials },
+                { value: "vendors",       label: "🤝 Trade Vendors", show: isAdmin || activeRole === "project_manager" || activeRole === "procurement_officer" || activeRole === "accountant" },
+                { value: "tasks",         label: `Tasks (${projectTasks.length})`, show: true },
+                { value: "punchlist",     label: `Punch List (${openPunch} open)`, show: true },
+                { value: "budget",        label: `Budget (${projectBudget.length})`, show: canViewFinancials },
+                { value: "stakeholders",  label: `Stakeholders (${projectStakeholders.length})`, show: true },
+                { value: "documents",     label: `Documents (${projectDocs.length})`, show: true },
+              ]
+                .filter(t => t.show)
+                .map(t => (
+                  <TabsTrigger key={t.value} value={t.value}
+                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-sm">
+                    {t.label}
+                  </TabsTrigger>
+                ))}
             </TabsList>
 
             <div className="py-6">
-              {/* ── Overview ── */}
-              <TabsContent value="overview" className="m-0 space-y-6">
+              {/* ── End-to-End Lifecycle Map ── */}
+              <TabsContent value="journey" className="m-0 space-y-6">
+                <ProjectJourneyView projectId={projectId} onNavigateTab={setActiveTab} />
+              </TabsContent>
+              <TabsContent value="team" className="m-0 space-y-6">
+                <ProjectJourneyView projectId={projectId} onNavigateTab={setActiveTab} />
+              </TabsContent>
 
-                {/* ── Workflow Next-Steps Guide ── */}
-                {(() => {
-                  type Action = { icon: React.ReactNode; label: string; desc: string; tab?: string; done?: boolean };
-                  const guide: Record<string, { title: string; actions: Action[] }> = {
-                    planning: {
-                      title: "Start by setting up the project foundation",
-                      actions: [
-                        { icon: <LayoutTemplate className="h-4 w-4" />, label: "Apply a task template", desc: "Generate the full task plan in one click", tab: "tasks", done: projectTasks.length > 0 },
-                        { icon: <CheckCircle2 className="h-4 w-4" />, label: "Add budget items", desc: "Set up cost codes and allocated amounts", tab: "budget", done: projectBudget.length > 0 },
-                        { icon: <Circle className="h-4 w-4" />, label: "Add stakeholders", desc: "Client, consultants, contractors", tab: "stakeholders", done: projectStakeholders.length > 0 },
-                        { icon: <FileText className="h-4 w-4" />, label: "Upload key documents", desc: "Drawings, approvals, contracts", tab: "documents", done: projectDocs.length > 0 },
-                      ],
-                    },
-                    procurement: {
-                      title: "Procurement phase — source materials and vendors",
-                      actions: [
-                        { icon: <Circle className="h-4 w-4" />, label: "Raise material requests", desc: "List all materials needed", done: false },
-                        { icon: <Circle className="h-4 w-4" />, label: "Send RFQs to vendors", desc: "Compare quotations before ordering" },
-                        { icon: <Circle className="h-4 w-4" />, label: "Create purchase orders", desc: "Issue approved POs to vendors" },
-                        { icon: <CheckCircle2 className="h-4 w-4" />, label: "Update task progress", desc: "Mark procurement tasks as done", tab: "tasks", done: projectTasks.filter(t => t.status === "completed").length > 0 },
-                      ],
-                    },
-                    execution: {
-                      title: "Execution phase — track site progress",
-                      actions: [
-                        { icon: <Clock className="h-4 w-4" />, label: "Update task status", desc: "Move tasks to In Progress / Completed", tab: "tasks", done: projectTasks.filter(t => t.status === "in_progress" || t.status === "completed").length > 0 },
-                        { icon: <Circle className="h-4 w-4" />, label: "Log expenses", desc: "Record site costs against budget", tab: "budget", done: false },
-                        { icon: <Circle className="h-4 w-4" />, label: "Create RA bills", desc: "Raise running account bills at milestones", tab: "rabills", done: projectRaBills.length > 0 },
-                        { icon: <FileText className="h-4 w-4" />, label: "Upload progress photos", desc: "Document work done on site", tab: "documents" },
-                      ],
-                    },
-                    qc: {
-                      title: "QC phase — inspect, punch, and clear",
-                      actions: [
-                        { icon: <ClipboardList className="h-4 w-4" />, label: "Add punch list items", desc: "Record every defect during inspection", tab: "punchlist", done: projectPunch.length > 0 },
-                        { icon: <CheckCircle2 className="h-4 w-4" />, label: "Resolve open items", desc: `${openPunch} item${openPunch !== 1 ? "s" : ""} still open`, tab: "punchlist", done: openPunch === 0 && projectPunch.length > 0 },
-                        { icon: <FileText className="h-4 w-4" />, label: "Upload test reports", desc: "MEP commissioning, structural audits", tab: "documents" },
-                        { icon: <Circle className="h-4 w-4" />, label: "Complete all tasks", desc: `${projectTasks.filter(t => t.status !== "completed").length} tasks remaining`, tab: "tasks" },
-                      ],
-                    },
-                    handover: {
-                      title: "Handover — finalise, sign off, and close",
-                      actions: [
-                        { icon: <FileText className="h-4 w-4" />, label: "Upload as-built drawings", desc: "Final design documentation", tab: "documents" },
-                        { icon: <Circle className="h-4 w-4" />, label: "Clear all punch list items", desc: `${openPunch} item${openPunch !== 1 ? "s" : ""} still open`, tab: "punchlist", done: openPunch === 0 },
-                        { icon: <Circle className="h-4 w-4" />, label: "Issue final invoice", desc: "Raise balance payment invoice" },
-                        { icon: <Circle className="h-4 w-4" />, label: "Get client sign-off", desc: "Upload acceptance certificate", tab: "documents" },
-                      ],
-                    },
-                    archived: {
-                      title: "Project archived — all done",
-                      actions: [
-                        { icon: <CheckCircle2 className="h-4 w-4" />, label: "Project complete", desc: "All work finished and handed over", done: true },
-                      ],
-                    },
-                  };
+              {/* ── Procurement & Supply ── */}
+              <TabsContent value="procurement" className="m-0 space-y-6">
+                <ProjectProcurementTab projectId={projectId} />
+              </TabsContent>
 
-                  const stageKey = project.status in guide ? project.status : "planning";
-                  const g = guide[stageKey]!;
-                  const doneCount = g.actions.filter(a => a.done).length;
+              {/* ── Execution & Measurement ── */}
+              <TabsContent value="execution" className="m-0 space-y-6">
+                <ProjectExecutionTab projectId={projectId} />
+              </TabsContent>
 
-                  return (
-                    <Card className="border-primary/20 bg-primary/5">
-                      <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <CardTitle className="text-base text-primary">{g.title}</CardTitle>
-                          <span className="text-xs font-medium text-muted-foreground">{doneCount}/{g.actions.length} done</span>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {g.actions.map((action, i) => (
-                            <button
-                              key={i}
-                              className={`flex items-start gap-3 p-3 rounded-lg border text-left transition-all
-                                ${action.done
-                                  ? "border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20 dark:border-emerald-900 opacity-70"
-                                  : "border-border bg-background hover:border-primary/40 hover:bg-accent/50 cursor-pointer"}`}
-                              onClick={() => { if (action.tab) setActiveTab(action.tab); }}
-                            >
-                              <span className={`mt-0.5 shrink-0 ${action.done ? "text-emerald-600" : "text-primary"}`}>
-                                {action.done ? <CheckCircle2 className="h-4 w-4" /> : action.icon}
-                              </span>
-                              <div className="min-w-0">
-                                <div className={`text-sm font-medium ${action.done ? "line-through text-muted-foreground" : ""}`}>{action.label}</div>
-                                <div className="text-xs text-muted-foreground mt-0.5">{action.desc}</div>
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })()}
-
-                <Card>
-                  <CardHeader><CardTitle className="text-base">Project Description</CardTitle></CardHeader>
-                  <CardContent>
-                    <p className="text-sm leading-relaxed">{project.description || "No description provided."}</p>
-                  </CardContent>
-                </Card>
-
-                {projectTasks.length > 0 && (() => {
-                  const phases: Record<string, typeof projectTasks> = {};
-                  for (const t of projectTasks) {
-                    const m = (t.description ?? "").match(/^\[([^\]]+)\]/);
-                    const phase = m ? m[1] : "Other";
-                    (phases[phase] ??= []).push(t);
-                  }
-                  const phaseOrder = ["Initiation", "Planning", "Procurement", "Execution", "Closeout", "Other"];
-                  const completed = projectTasks.filter(t => t.status === "completed").length;
-                  return (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-base">Project Task Phases</CardTitle>
-                        <CardDescription>{completed}/{projectTasks.length} tasks complete</CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-5">
-                        {phaseOrder.filter(p => phases[p]).map(phase => {
-                          const items = phases[phase]!;
-                          const done = items.filter(t => t.status === "completed").length;
-                          return (
-                            <div key={phase}>
-                              <div className="flex items-center justify-between mb-2">
-                                <h4 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">{phase}</h4>
-                                <span className="text-xs text-muted-foreground">{done}/{items.length}</span>
-                              </div>
-                              <div className="space-y-2">
-                                {items.map(t => {
-                                  const Icon = t.status === "completed" ? CheckCircle2 : t.status === "in_progress" ? Clock : Circle;
-                                  const colour = t.status === "completed" ? "text-emerald-600" : t.status === "in_progress" ? "text-amber-600" : "text-muted-foreground";
-                                  return (
-                                    <div key={t.id} className="flex items-start gap-3 rounded-md border bg-background/50 px-3 py-2">
-                                      <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${colour}`} />
-                                      <div className="flex-1 min-w-0">
-                                        <div className="text-sm font-medium truncate">{t.title}</div>
-                                        <div className="text-xs text-muted-foreground">
-                                          {t.startDate ? format(new Date(t.startDate), "MMM d") : "—"} → {t.endDate ? format(new Date(t.endDate), "MMM d, yyyy") : "—"}
-                                        </div>
-                                      </div>
-                                      <TaskStatusSelect task={t} projectId={projectId} />
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </CardContent>
-                    </Card>
-                  );
-                })()}
+              {/* ── Trade Vendors & Subcontracts ── */}
+              <TabsContent value="vendors" className="m-0 space-y-6">
+                <ProjectVendorsTab projectId={projectId} />
               </TabsContent>
 
               {/* ── Tasks ── */}
@@ -920,48 +938,15 @@ export default function ProjectDetail() {
                   </div>
                 </div>
 
-                {projectTasks.length === 0 ? (
-                  <div className="rounded-md border border-dashed p-12 text-center space-y-3 text-muted-foreground">
-                    <LayoutTemplate className="h-10 w-10 mx-auto opacity-30" />
-                    <p className="font-medium">No tasks yet</p>
-                    <p className="text-sm">Apply a template to generate a complete task plan in one click, or add tasks manually.</p>
-                    <Button size="sm" variant="outline" className="gap-2 mt-2" onClick={() => setApplyOpen(true)}>
-                      <LayoutTemplate className="h-4 w-4" /> Apply Template
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="grid gap-4 md:grid-cols-4">
-                    {TASK_STATUS_OPTIONS.map(({ value: status, label, dot }) => {
-                      const st = projectTasks.filter(t => t.status === status);
-                      return (
-                        <div key={status} className="bg-muted/50 p-4 rounded-lg space-y-3">
-                          <h3 className="font-semibold text-sm flex items-center justify-between">
-                            <span className="flex items-center gap-1.5">
-                              <span className={`h-2 w-2 rounded-full ${dot}`} />
-                              {label}
-                            </span>
-                            <Badge variant="secondary">{st.length}</Badge>
-                          </h3>
-                          {st.map(task => (
-                            <Card key={task.id} className="p-3 shadow-sm hover:border-primary/50 transition-colors">
-                              <div className="font-medium text-sm mb-1">{task.title}</div>
-                              <div className="flex justify-between items-center text-xs text-muted-foreground mt-2">
-                                <span>{task.assignedToName || "Unassigned"}</span>
-                                <Badge variant="outline" className="text-[10px] h-4">{task.priority}</Badge>
-                              </div>
-                              <div className="mt-2">
-                                <TaskStatusSelect task={task} projectId={projectId} />
-                              </div>
-                            </Card>
-                          ))}
-                          {st.length === 0 && (
-                            <div className="text-xs text-center text-muted-foreground py-4 border border-dashed rounded bg-background/50">Empty</div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                <ProjectGanttChart
+                  tasks={projectTasks}
+                  projectId={projectId}
+                  projectStartDate={project?.startDate}
+                  projectEndDate={project?.endDate}
+                  onOpenAddTask={() => setAddTaskOpen(true)}
+                  onOpenApplyTemplate={() => setApplyOpen(true)}
+                  renderStatusSelect={(task) => <TaskStatusSelect task={task} projectId={projectId} />}
+                />
               </TabsContent>
 
               {/* ── Punch List ── */}
@@ -975,10 +960,19 @@ export default function ProjectDetail() {
                       {resolvedPunch}/{projectPunch.length} items resolved · {openPunch} open
                     </p>
                   </div>
-                  <Dialog open={punchOpen} onOpenChange={setPunchOpen}>
-                    <DialogTrigger asChild>
-                      <Button size="sm" className="gap-2"><Plus className="h-4 w-4" /> Add Item</Button>
-                    </DialogTrigger>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 text-xs"
+                      onClick={() => window.open(`/api/projects/${projectId}/punch-list/export-pdf?autoPrint=true`, '_blank', 'width=1000,height=800')}
+                    >
+                      <Printer className="h-4 w-4 text-primary" /> Export Snag List PDF
+                    </Button>
+                    <Dialog open={punchOpen} onOpenChange={setPunchOpen}>
+                      <DialogTrigger asChild>
+                        <Button size="sm" className="gap-2"><Plus className="h-4 w-4" /> Add Item</Button>
+                      </DialogTrigger>
                     <DialogContent className="max-w-lg">
                       <DialogHeader>
                         <DialogTitle>New Punch List Item</DialogTitle>
@@ -1028,6 +1022,7 @@ export default function ProjectDetail() {
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>
+                  </div>
                 </div>
 
                 {/* Summary bar */}
@@ -1305,170 +1300,53 @@ export default function ProjectDetail() {
                 </DialogContent>
               </Dialog>
 
-              {/* ── Budget ── */}
+              {/* ── Budget & Cost Variance (FR-BUD-03) ── */}
               <TabsContent value="budget" className="m-0 space-y-4">
-                <div className="flex justify-end">
-                  <Dialog open={addBudgetOpen} onOpenChange={setAddBudgetOpen}>
-                    <DialogTrigger asChild>
-                      <Button size="sm"><Plus className="w-4 h-4 mr-2" /> Add Budget Item</Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-md">
-                      <DialogHeader>
-                        <DialogTitle>Add Budget Item</DialogTitle>
-                        <DialogDescription>Add a new cost code and budget line to this project.</DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4 py-2">
-                        <div className="space-y-2">
-                          <Label htmlFor="bi-code">Cost Code <span className="text-destructive">*</span></Label>
-                          <Input id="bi-code" value={budgetForm.costCode} onChange={e => setBudgetForm(f => ({ ...f, costCode: e.target.value }))} placeholder="e.g. CIVIL-01" />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="bi-desc">Description <span className="text-destructive">*</span></Label>
-                          <Input id="bi-desc" value={budgetForm.description} onChange={e => setBudgetForm(f => ({ ...f, description: e.target.value }))} placeholder="Budget line description" />
-                        </div>
-                        <div className="grid grid-cols-3 gap-3">
-                          <div className="space-y-2">
-                            <Label htmlFor="bi-budgeted">Budgeted (₹) <span className="text-destructive">*</span></Label>
-                            <Input id="bi-budgeted" type="number" min="0" value={budgetForm.budgeted} onChange={e => setBudgetForm(f => ({ ...f, budgeted: e.target.value }))} placeholder="0" />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="bi-committed">Committed (₹)</Label>
-                            <Input id="bi-committed" type="number" min="0" value={budgetForm.committed} onChange={e => setBudgetForm(f => ({ ...f, committed: e.target.value }))} placeholder="0" />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="bi-actual">Actual (₹)</Label>
-                            <Input id="bi-actual" type="number" min="0" value={budgetForm.actual} onChange={e => setBudgetForm(f => ({ ...f, actual: e.target.value }))} placeholder="0" />
-                          </div>
-                        </div>
-                      </div>
-                      <DialogFooter>
-                        <Button variant="outline" onClick={() => setAddBudgetOpen(false)} disabled={createBudgetItem.isPending}>Cancel</Button>
-                        <Button onClick={handleCreateBudgetItem} disabled={createBudgetItem.isPending || !budgetForm.costCode.trim() || !budgetForm.description.trim() || !budgetForm.budgeted}>
-                          {createBudgetItem.isPending ? "Adding…" : "Add Item"}
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-                <div className="rounded-md border bg-card">
-                  <table className="w-full text-sm text-left">
-                    <thead className="bg-muted/50 text-muted-foreground border-b">
-                      <tr>
-                        <th className="px-4 py-3 font-medium">Cost Code</th>
-                        <th className="px-4 py-3 font-medium">Description</th>
-                        <th className="px-4 py-3 font-medium text-right">Budgeted</th>
-                        <th className="px-4 py-3 font-medium text-right">Committed</th>
-                        <th className="px-4 py-3 font-medium text-right">Actual</th>
-                        <th className="px-4 py-3 font-medium text-right">Variance</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {projectBudget.map(item => {
-                        const variance = item.budgeted - item.actual;
-                        return (
-                          <tr key={item.id} className="hover:bg-accent/50 transition-colors">
-                            <td className="px-4 py-3 font-mono">{item.costCode}</td>
-                            <td className="px-4 py-3">{item.description}</td>
-                            <td className="px-4 py-3 text-right">{INR.format(item.budgeted)}</td>
-                            <td className="px-4 py-3 text-right">{INR.format(item.committed)}</td>
-                            <td className="px-4 py-3 text-right">{INR.format(item.actual)}</td>
-                            <td className={`px-4 py-3 text-right font-medium ${variance < 0 ? "text-destructive" : "text-emerald-600"}`}>
-                              {INR.format(variance)}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                      {projectBudget.length === 0 && (
-                        <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground border-dashed border-t">No budget items found.</td></tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                <PermissionGate
+                  permission={PERMISSIONS.PROJECT_BUDGET_VIEW}
+                  fallback={
+                    <AccessDeniedView
+                      title="Budget Access Restricted"
+                      description="Monetary cost codes and project budget variances are restricted to Authorized Finance and Executive roles."
+                    />
+                  }
+                >
+                  <ProjectBudgetTab
+                    projectId={projectId}
+                    project={project}
+                    canManageBudget={isAdmin || activeRole === "project_manager" || activeRole === "accountant"}
+                  />
+                </PermissionGate>
               </TabsContent>
 
-              {/* ── RA Bills ── */}
-              <TabsContent value="rabills" className="m-0 space-y-4">
-                <div className="flex justify-end">
-                  <Dialog open={createBillOpen} onOpenChange={setCreateBillOpen}>
-                    <DialogTrigger asChild>
-                      <Button size="sm"><Plus className="w-4 h-4 mr-2" /> Create RA Bill</Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-md">
-                      <DialogHeader>
-                        <DialogTitle>Create RA Bill</DialogTitle>
-                        <DialogDescription>Create a new Running Account bill for this project.</DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4 py-2">
-                        <div className="space-y-2">
-                          <Label htmlFor="ra-num">Bill Number <span className="text-destructive">*</span></Label>
-                          <Input id="ra-num" value={billForm.billNumber} onChange={e => setBillForm(f => ({ ...f, billNumber: e.target.value }))} placeholder="e.g. RA-2026-001" />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="ra-amount">Amount (₹) <span className="text-destructive">*</span></Label>
-                          <Input id="ra-amount" type="number" min="0" value={billForm.amount} onChange={e => setBillForm(f => ({ ...f, amount: e.target.value }))} placeholder="0" />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="ra-milestone">Milestone</Label>
-                          <Input id="ra-milestone" value={billForm.milestone} onChange={e => setBillForm(f => ({ ...f, milestone: e.target.value }))} placeholder="e.g. Foundation complete" />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="ra-desc">Description</Label>
-                          <Textarea id="ra-desc" value={billForm.description} onChange={e => setBillForm(f => ({ ...f, description: e.target.value }))} placeholder="Optional notes" rows={3} />
-                        </div>
-                      </div>
-                      <DialogFooter>
-                        <Button variant="outline" onClick={() => setCreateBillOpen(false)} disabled={createRaBill.isPending}>Cancel</Button>
-                        <Button onClick={handleCreateRaBill} disabled={createRaBill.isPending || !billForm.billNumber.trim() || !billForm.amount}>
-                          {createRaBill.isPending ? "Creating…" : "Create Bill"}
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-                <div className="grid gap-4">
-                  {projectRaBills.map(bill => (
-                    <Card key={bill.id}>
-                      <CardContent className="p-4 flex items-center justify-between gap-4">
-                        <div className="space-y-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-bold text-lg">{bill.billNumber}</span>
-                            <Badge variant={bill.status === "approved" || bill.status === "invoiced" ? "default" : "secondary"} className="capitalize">{bill.status}</Badge>
-                          </div>
-                          <p className="text-sm text-muted-foreground truncate">{bill.description || bill.milestone || "—"}</p>
-                        </div>
-                        <div className="flex items-center gap-3 shrink-0">
-                          <div className="text-right">
-                            <div className="font-bold text-xl text-primary">{INR.format(bill.amount)}</div>
-                            <div className="text-xs text-muted-foreground">{format(new Date(bill.createdAt), "MMM d, yyyy")}</div>
-                          </div>
-                          <div className="flex flex-col gap-1">
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-8 w-8"
-                              title="View / Print"
-                              onClick={() => setSelectedBill(bill)}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-8 w-8"
-                              title="Print"
-                              onClick={() => handlePrintBill(bill)}
-                            >
-                              <Printer className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                  {projectRaBills.length === 0 && (
-                    <div className="text-center py-12 border rounded-lg border-dashed text-muted-foreground">No RA Bills found.</div>
-                  )}
-                </div>
+              {/* ── Commercial & Finance (Client AR, Vendor AP, Site Expenses, Profitability) ── */}
+              <TabsContent value="commercial" className="m-0 space-y-6">
+                <PermissionGate
+                  permission={PERMISSIONS.PROJECT_BUDGET_VIEW}
+                  fallback={
+                    <AccessDeniedView
+                      title="Commercial & Finance Restricted"
+                      description="Client AR invoices, vendor AP ledgers, and profit margins are restricted to Authorized Finance and Executive roles."
+                    />
+                  }
+                >
+                  <ProjectCommercialControl
+                    projectId={projectId}
+                    projectBudget={Number(project.budget || 0)}
+                    projectName={project.name}
+                    clientName={project.clientName || undefined}
+                  />
+                </PermissionGate>
+              </TabsContent>
+
+              {/* Backward compatibility for ?tab=rabills query links */}
+              <TabsContent value="rabills" className="m-0 space-y-6">
+                <ProjectCommercialControl
+                  projectId={projectId}
+                  projectBudget={Number(project.budget || 0)}
+                  projectName={project.name}
+                  clientName={project.clientName || undefined}
+                />
               </TabsContent>
 
               {/* ── RA Bill Detail Dialog ── */}
@@ -1674,7 +1552,7 @@ export default function ProjectDetail() {
                     <DialogTrigger asChild>
                       <Button size="sm"><Plus className="w-4 h-4 mr-2" /> Upload Document</Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-md">
+                    <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
                       <DialogHeader>
                         <DialogTitle>Upload Document</DialogTitle>
                         <DialogDescription>Register a document or paste a link for this project.</DialogDescription>
@@ -1701,9 +1579,131 @@ export default function ProjectDetail() {
                           <Label htmlFor="doc-type">File Type</Label>
                           <Input id="doc-type" value={docForm.fileType} onChange={e => setDocForm(f => ({ ...f, fileType: e.target.value }))} placeholder="e.g. PDF, DWG, DOCX" />
                         </div>
+                        
+                        {/* Photos/Files Upload Section */}
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+                              <Upload className="w-4 h-4" />
+                              Upload Files
+                            </Label>
+                            <label
+                              htmlFor="doc-file-upload"
+                              className="flex items-center gap-1.5 text-xs font-medium text-primary hover:underline cursor-pointer"
+                            >
+                              <Plus className="w-4 h-4" />
+                              Add Files
+                            </label>
+                            <input
+                              id="doc-file-upload"
+                              type="file"
+                              className="hidden"
+                              multiple
+                              accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.dwg,.dxf"
+                              onChange={(e) => {
+                                const files = Array.from(e.target.files || []);
+                                if (files.length > 0) {
+                                  setSelectedDocFiles(prev => [...prev, ...files]);
+                                  // Auto-populate fileName from first file if empty
+                                  if (!docForm.fileName && files[0]) {
+                                    setDocForm(f => ({
+                                      ...f,
+                                      fileName: files[0].name,
+                                      fileType: files[0].name.split('.').pop() || "",
+                                    }));
+                                  }
+                                }
+                              }}
+                            />
+                          </div>
+                          
+                          {selectedDocFiles.length > 0 ? (
+                            <div className="grid grid-cols-2 gap-3">
+                              {selectedDocFiles.map((file, index) => {
+                                const isImage = file.type.startsWith('image/');
+                                let fileUrl = '';
+                                try {
+                                  fileUrl = URL.createObjectURL(file);
+                                } catch (e) {
+                                  console.error('Error creating object URL:', e);
+                                }
+                                
+                                return (
+                                  <div key={`${file.name}-${index}`} className="relative group">
+                                    <div className="aspect-square rounded-lg border-2 border-border overflow-hidden bg-muted flex items-center justify-center">
+                                      {isImage && fileUrl ? (
+                                        <img
+                                          src={fileUrl}
+                                          alt={file.name}
+                                          className="w-full h-full object-cover"
+                                        />
+                                      ) : (
+                                        <div className="flex flex-col items-center justify-center p-4 text-center">
+                                          <FileText className="w-8 h-8 text-muted-foreground mb-1" />
+                                          <p className="text-xs font-medium text-muted-foreground truncate w-full">
+                                            {file.name}
+                                          </p>
+                                        </div>
+                                      )}
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => setSelectedDocFiles(prev => prev.filter((_, i) => i !== index))}
+                                      className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </button>
+                                    <p className="text-xs text-muted-foreground text-center mt-1 truncate">
+                                      {(file.size / 1024).toFixed(0)} KB
+                                    </p>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <label
+                              htmlFor="doc-file-upload-area"
+                              className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-accent/50 transition-colors"
+                            >
+                              <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                <Upload className="w-10 h-10 mb-3 text-muted-foreground" />
+                                <p className="mb-2 text-sm text-muted-foreground">
+                                  <span className="font-semibold">Click to upload</span> documents
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  PDF, DWG, Images, Office files supported
+                                </p>
+                              </div>
+                              <input
+                                id="doc-file-upload-area"
+                                type="file"
+                                className="hidden"
+                                multiple
+                                accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.dwg,.dxf"
+                                onChange={(e) => {
+                                  const files = Array.from(e.target.files || []);
+                                  if (files.length > 0) {
+                                    setSelectedDocFiles(prev => [...prev, ...files]);
+                                    if (!docForm.fileName && files[0]) {
+                                      setDocForm(f => ({
+                                        ...f,
+                                        fileName: files[0].name,
+                                        fileType: files[0].name.split('.').pop() || "",
+                                      }));
+                                    }
+                                  }
+                                }}
+                              />
+                            </label>
+                          )}
+                        </div>
+                        
                         <div className="space-y-2">
                           <Label htmlFor="doc-url">File URL (optional)</Label>
-                          <Input id="doc-url" value={docForm.fileUrl} onChange={e => setDocForm(f => ({ ...f, fileUrl: e.target.value }))} placeholder="https://..." />
+                          <Input id="doc-url" value={docForm.fileUrl} onChange={e => setDocForm(f => ({ ...f, fileUrl: e.target.value }))} placeholder="https://... (or leave blank to use uploaded files)" />
+                          <p className="text-xs text-muted-foreground">
+                            Provide an external URL if not uploading files above
+                          </p>
                         </div>
                       </div>
                       <DialogFooter>

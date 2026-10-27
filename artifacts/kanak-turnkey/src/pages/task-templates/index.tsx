@@ -265,17 +265,17 @@ export default function TaskTemplates() {
       </div>
 
       {/* Summary strip */}
-      {templates && templates.length > 0 && (
+      {templates && Array.isArray(templates) && templates.length > 0 && (
         <div className="flex gap-4 text-sm text-muted-foreground">
           <span><strong className="text-foreground">{templates.length}</strong> templates</span>
-          <span><strong className="text-foreground">{templates.reduce((s, t) => s + t.itemCount, 0)}</strong> total tasks</span>
+          <span><strong className="text-foreground">{templates.reduce((s, t) => s + (t.itemCount || 0), 0)}</strong> total tasks</span>
           <span><strong className="text-foreground">{templates.filter(t => t.isDefault).length}</strong> default</span>
         </div>
       )}
 
       {/* Template cards */}
       <div className="space-y-3">
-        {templates?.map(tpl => (
+        {(Array.isArray(templates) ? templates : []).map(tpl => (
           <Card key={tpl.id} className="overflow-hidden">
             <Collapsible open={openId === tpl.id} onOpenChange={o => setOpenId(o ? tpl.id : null)}>
               <CollapsibleTrigger asChild>
@@ -325,7 +325,7 @@ export default function TaskTemplates() {
           </Card>
         ))}
 
-        {!templates?.length && !isLoading && (
+        {!(Array.isArray(templates) ? templates : []).length && !isLoading && (
           <div className="rounded-md border border-dashed p-12 text-center space-y-2 text-muted-foreground">
             <LayoutTemplate className="h-10 w-10 mx-auto opacity-30" />
             <p className="font-medium">No templates yet</p>

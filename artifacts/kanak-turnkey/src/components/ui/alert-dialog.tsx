@@ -25,22 +25,55 @@ const AlertDialogOverlay = React.forwardRef<
 ))
 AlertDialogOverlay.displayName = AlertDialogPrimitive.Overlay.displayName
 
+function hasAlertDialogDescription(children: React.ReactNode): boolean {
+  let found = false;
+  React.Children.forEach(children, (child) => {
+    if (found || !React.isValidElement(child)) return;
+    const type = child.type as any;
+    if (
+      type === AlertDialogDescription ||
+      type === AlertDialogPrimitive.Description ||
+      type?.displayName === "AlertDialogDescription" ||
+      type?.displayName === AlertDialogPrimitive.Description.displayName ||
+      type?.name === "AlertDialogDescription"
+    ) {
+      found = true;
+      return;
+    }
+    const childProps = (child as React.ReactElement<any>).props;
+    if (childProps?.children && hasAlertDialogDescription(childProps.children)) {
+      found = true;
+    }
+  });
+  return found;
+}
+
 const AlertDialogContent = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Content>
->(({ className, ...props }, ref) => (
-  <AlertDialogPortal>
-    <AlertDialogOverlay />
-    <AlertDialogPrimitive.Content
-      ref={ref}
-      className={cn(
-        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
-        className
-      )}
-      {...props}
-    />
-  </AlertDialogPortal>
-))
+>(({ className, children, ...props }, ref) => {
+  const hasDesc = hasAlertDialogDescription(children);
+  const ariaDescribedbyProp = props["aria-describedby"] !== undefined
+    ? { "aria-describedby": props["aria-describedby"] }
+    : (hasDesc ? {} : { "aria-describedby": undefined });
+
+  return (
+    <AlertDialogPortal>
+      <AlertDialogOverlay />
+      <AlertDialogPrimitive.Content
+        ref={ref}
+        {...ariaDescribedbyProp}
+        className={cn(
+          "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
+          className
+        )}
+        {...props}
+      >
+        {children}
+      </AlertDialogPrimitive.Content>
+    </AlertDialogPortal>
+  );
+})
 AlertDialogContent.displayName = AlertDialogPrimitive.Content.displayName
 
 const AlertDialogHeader = ({

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { useGetCurrentUser, useSwitchRole, getGetCurrentUserQueryKey } from "@workspace/api-client-react";
+import { useGetCurrentUser, useSwitchRole, useLogout, getGetCurrentUserQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { 
   DropdownMenu, 
@@ -27,12 +27,13 @@ const ROLE_LABELS: Record<string, string> = {
 export function Topbar() {
   const { data: user } = useGetCurrentUser();
   const switchRole = useSwitchRole();
+  const logoutMutation = useLogout();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
   const handleRoleSwitch = (role: any) => {
-    switchRole.mutate({ data: { role } }, {
+    switchRole.mutate({ role }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetCurrentUserQueryKey() });
         toast({
@@ -40,13 +41,25 @@ export function Topbar() {
           description: `You are now operating as ${ROLE_LABELS[role] || role}`,
         });
       },
-      onError: (error) => {
+      onError: (error: any) => {
         toast({
           variant: "destructive",
           title: "Failed to switch role",
-          description: "An error occurred while switching roles.",
+          description: error?.message || "An error occurred while switching roles.",
         });
       }
+    });
+  };
+
+  const handleLogout = () => {
+    logoutMutation.mutate(undefined, {
+      onError: () => {
+        toast({
+          variant: "destructive",
+          title: "Logout Failed",
+          description: "Could not log out. Please try again.",
+        });
+      },
     });
   };
 
@@ -76,7 +89,7 @@ export function Topbar() {
           <DropdownMenuContent align="end" className="w-48">
             <DropdownMenuLabel>Switch Role</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {user.roles.map((role) => (
+            {user.roles && Array.isArray(user.roles) && user.roles.map((role) => (
               <DropdownMenuItem 
                 key={role} 
                 onClick={() => handleRoleSwitch(role)}
@@ -112,9 +125,9 @@ export function Topbar() {
               <span>Settings</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={handleLogout} disabled={logoutMutation.isPending}>
               <LogOut className="mr-2 h-4 w-4" />
-              <span>Log out</span>
+              <span>{logoutMutation.isPending ? "Logging out..." : "Log out"}</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

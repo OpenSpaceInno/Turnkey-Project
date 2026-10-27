@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db, taskTemplatesTable, taskTemplateItemsTable, tasksTable } from "@workspace/db";
 import { eq, sql, asc } from "drizzle-orm";
+import { getCurrentUser } from "../lib/session";
 
 function addDays(date: Date, days: number): Date {
   const d = new Date(date);
@@ -183,12 +184,21 @@ async function seedTemplatesIfEmpty() {
   if (existing.length > 0) { seeded = true; return; }
 
   for (const tpl of SEED_TEMPLATES) {
-    const [inserted] = await db.insert(taskTemplatesTable).values({
+    // MySQL doesn't support .returning() - insert then query
+    await db.insert(taskTemplatesTable).values({
       name: tpl.name,
       description: tpl.description,
       projectType: tpl.projectType,
       isDefault: tpl.isDefault,
-    }).returning({ id: taskTemplatesTable.id });
+    });
+    
+    // Query to get the inserted record
+    const [inserted] = await db
+      .select({ id: taskTemplatesTable.id })
+      .from(taskTemplatesTable)
+      .where(eq(taskTemplatesTable.name, tpl.name))
+      .limit(1);
+    
     if (!inserted) continue;
     const items = tpl.items.map((item, i) => ({
       templateId: inserted.id,
@@ -218,7 +228,7 @@ router.get("/task-templates", async (req, res) => {
       isDefault: taskTemplatesTable.isDefault,
       createdById: taskTemplatesTable.createdById,
       createdAt: taskTemplatesTable.createdAt,
-      itemCount: sql<number>`count(${taskTemplateItemsTable.id})::int`,
+      itemCount: sql<number>`count(${taskTemplateItemsTable.id})`,
     })
     .from(taskTemplatesTable)
     .leftJoin(taskTemplateItemsTable, eq(taskTemplateItemsTable.templateId, taskTemplatesTable.id))
@@ -231,13 +241,22 @@ router.get("/task-templates", async (req, res) => {
 router.post("/task-templates", async (req, res) => {
   const { name, description, projectType, isDefault } = req.body;
   const user = (req as any).user;
-  const [row] = await db.insert(taskTemplatesTable).values({
+  await db.insert(taskTemplatesTable).values({
     name,
     description: description ?? null,
     projectType: projectType ?? null,
     isDefault: isDefault ?? false,
     createdById: user?.id ?? null,
-  }).returning();
+  });
+  
+  // MySQL doesn't support .returning() - query after insert
+  const [row] = await db
+    .select()
+    .from(taskTemplatesTable)
+    .where(eq(taskTemplatesTable.name, name))
+    .orderBy(sql`${taskTemplatesTable.id} DESC`)
+    .limit(1);
+  
   res.status(201).json({ ...row, itemCount: 0 });
 });
 
@@ -254,7 +273,7 @@ router.get("/task-templates/:id", async (req, res) => {
       isDefault: taskTemplatesTable.isDefault,
       createdById: taskTemplatesTable.createdById,
       createdAt: taskTemplatesTable.createdAt,
-      itemCount: sql<number>`count(${taskTemplateItemsTable.id})::int`,
+      itemCount: sql<number>`count(${taskTemplateItemsTable.id})`,
     })
     .from(taskTemplatesTable)
     .leftJoin(taskTemplateItemsTable, eq(taskTemplateItemsTable.templateId, taskTemplatesTable.id))
@@ -276,10 +295,17 @@ router.get("/task-templates/:id", async (req, res) => {
 router.patch("/task-templates/:id", async (req, res) => {
   const id = parseInt(req.params.id!);
   const { name, description, projectType, isDefault } = req.body;
-  const [row] = await db.update(taskTemplatesTable)
+  await db.update(taskTemplatesTable)
     .set({ name, description, projectType, isDefault })
+    .where(eq(taskTemplatesTable.id, id));
+  
+  // MySQL doesn't support .returning() - query after update
+  const [row] = await db
+    .select()
+    .from(taskTemplatesTable)
     .where(eq(taskTemplatesTable.id, id))
-    .returning();
+    .limit(1);
+  
   if (!row) return res.status(404).json({ error: "Not found" });
   res.json({ ...row, itemCount: 0 });
 });
@@ -296,7 +322,7 @@ router.delete("/task-templates/:id", async (req, res) => {
 router.post("/task-templates/:id/items", async (req, res) => {
   const templateId = parseInt(req.params.id!);
   const { title, description, phase, priority, estimatedDays, sortOrder } = req.body;
-  const [row] = await db.insert(taskTemplateItemsTable).values({
+  await db.insert(taskTemplateItemsTable).values({
     templateId,
     title,
     description: description ?? null,
@@ -304,7 +330,16 @@ router.post("/task-templates/:id/items", async (req, res) => {
     priority: priority ?? "medium",
     estimatedDays: estimatedDays ?? null,
     sortOrder: sortOrder ?? 0,
-  }).returning();
+  });
+  
+  // MySQL doesn't support .returning() - query after insert
+  const [row] = await db
+    .select()
+    .from(taskTemplateItemsTable)
+    .where(eq(taskTemplateItemsTable.templateId, templateId))
+    .orderBy(sql`${taskTemplateItemsTable.id} DESC`)
+    .limit(1);
+  
   res.status(201).json(row);
 });
 
@@ -312,10 +347,17 @@ router.post("/task-templates/:id/items", async (req, res) => {
 router.patch("/task-templates/:id/items/:itemId", async (req, res) => {
   const itemId = parseInt(req.params.itemId!);
   const { title, description, phase, priority, estimatedDays, sortOrder } = req.body;
-  const [row] = await db.update(taskTemplateItemsTable)
+  await db.update(taskTemplateItemsTable)
     .set({ title, description, phase, priority, estimatedDays, sortOrder })
+    .where(eq(taskTemplateItemsTable.id, itemId));
+  
+  // MySQL doesn't support .returning() - query after update
+  const [row] = await db
+    .select()
+    .from(taskTemplateItemsTable)
     .where(eq(taskTemplateItemsTable.id, itemId))
-    .returning();
+    .limit(1);
+  
   if (!row) return res.status(404).json({ error: "Not found" });
   res.json(row);
 });
@@ -327,41 +369,119 @@ router.delete("/task-templates/:id/items/:itemId", async (req, res) => {
   res.status(204).end();
 });
 
-// POST /task-templates/:id/apply
-router.post("/task-templates/:id/apply", async (req, res) => {
-  const templateId = parseInt(req.params.id!);
-  const { projectId, startDate } = req.body;
-  const user = (req as any).user;
+// Deduplicate tasks across projects
+export async function deduplicateTasks(projectId?: number): Promise<number> {
+  try {
+    const allTasks = projectId
+      ? await db.select().from(tasksTable).where(eq(tasksTable.projectId, projectId))
+      : await db.select().from(tasksTable);
 
-  const items = await db
-    .select()
-    .from(taskTemplateItemsTable)
-    .where(eq(taskTemplateItemsTable.templateId, templateId))
-    .orderBy(asc(taskTemplateItemsTable.sortOrder));
+    const seen = new Map<string, typeof allTasks[0]>();
+    const toDelete: number[] = [];
 
-  if (items.length === 0) return res.json({ tasksCreated: 0 });
+    for (const t of allTasks) {
+      const key = `${t.projectId}___${t.title.trim().toLowerCase()}`;
+      if (seen.has(key)) {
+        const existing = seen.get(key)!;
+        if (existing.status === "todo" && t.status !== "todo") {
+          toDelete.push(existing.id);
+          seen.set(key, t);
+        } else {
+          toDelete.push(t.id);
+        }
+      } else {
+        seen.set(key, t);
+      }
+    }
 
-  let cursor = startDate ? new Date(startDate) : new Date();
-  const toInsert = items.map(item => {
-    const taskStart = formatDate(cursor);
-    const days = item.estimatedDays ?? 7;
-    const taskEnd = formatDate(addDays(cursor, days));
-    cursor = addDays(cursor, days);
-    return {
-      projectId,
-      title: item.title,
-      description: item.phase ? `[${item.phase}] ${item.description ?? ""}`.trim() : (item.description ?? null),
-      priority: item.priority as "high" | "medium" | "low",
-      status: "todo" as const,
-      progress: 0,
-      startDate: taskStart,
-      endDate: taskEnd,
-      createdById: user?.id ?? null,
-    };
-  });
+    for (const id of toDelete) {
+      await db.delete(tasksTable).where(eq(tasksTable.id, id));
+    }
 
-  await db.insert(tasksTable).values(toInsert);
-  res.json({ tasksCreated: toInsert.length });
+    if (toDelete.length > 0) {
+      console.log(`Cleaned up ${toDelete.length} duplicate tasks from database.`);
+    }
+    return toDelete.length;
+  } catch (err) {
+    console.error("Error during task deduplication:", err);
+    return 0;
+  }
+}
+
+// Run deduplication on startup
+deduplicateTasks().catch(console.error);
+
+// POST /tasks/deduplicate
+router.post("/tasks/deduplicate", async (req, res) => {
+  const { projectId } = req.body ?? {};
+  const removed = await deduplicateTasks(projectId ? Number(projectId) : undefined);
+  res.json({ removedCount: removed });
 });
+
+// POST /task-templates/:id/apply & POST /task-templates/:id
+const handleApplyTemplate = async (req: any, res: any) => {
+  try {
+    const templateId = parseInt(req.params.id!);
+    const { projectId, startDate } = req.body ?? {};
+    const me = await getCurrentUser(req);
+
+    if (!projectId) {
+      return res.status(400).json({ error: "projectId is required" });
+    }
+
+    // Deduplicate any existing duplicates first
+    await deduplicateTasks(Number(projectId));
+
+    const items = await db
+      .select()
+      .from(taskTemplateItemsTable)
+      .where(eq(taskTemplateItemsTable.templateId, templateId))
+      .orderBy(asc(taskTemplateItemsTable.sortOrder));
+
+    if (items.length === 0) return res.json({ tasksCreated: 0 });
+
+    // Check existing tasks for this project
+    const existingTasks = await db
+      .select()
+      .from(tasksTable)
+      .where(eq(tasksTable.projectId, Number(projectId)));
+    const existingTitles = new Set(existingTasks.map(t => t.title.trim().toLowerCase()));
+
+    // Filter out items that are already present
+    const itemsToInsert = items.filter(item => !existingTitles.has(item.title.trim().toLowerCase()));
+
+    if (itemsToInsert.length === 0) {
+      return res.json({ tasksCreated: 0, message: "All tasks from this template already exist in the project." });
+    }
+
+    let cursor = startDate ? new Date(startDate) : new Date();
+    const toInsert = itemsToInsert.map(item => {
+      const taskStart = formatDate(cursor);
+      const days = item.estimatedDays ?? 7;
+      const taskEnd = formatDate(addDays(cursor, days));
+      cursor = addDays(cursor, days);
+      return {
+        projectId: Number(projectId),
+        title: item.title,
+        description: item.phase ? `[${item.phase}] ${item.description ?? ""}`.trim() : (item.description ?? null),
+        priority: (item.priority as "high" | "medium" | "low") || "medium",
+        status: "todo" as const,
+        progress: 0,
+        startDate: taskStart,
+        endDate: taskEnd,
+        createdById: me?.id ?? 1,
+      };
+    });
+
+    await db.insert(tasksTable).values(toInsert);
+    res.json({ tasksCreated: toInsert.length });
+  } catch (error) {
+    console.error("Error applying task template:", error);
+    res.status(500).json({ error: "Failed to apply task template" });
+  }
+};
+
+router.post("/task-templates/:id/apply", handleApplyTemplate);
+router.post("/task-templates/:id", handleApplyTemplate);
 
 export default router;

@@ -41,9 +41,24 @@ testem.log
 .DS_Store
 Thumbs.db
 
+# Uploaded files
+uploads/
+
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md
 
 # Replit
 .cache/
 .local/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+!*.example
+
+# Temporary media & scratch files
+*.zip
+extracted_*.jpg
+cookies.txt
+scratch/
