@@ -43,9 +43,12 @@ COPY --from=builder /app/artifacts/api-server/dist ./artifacts/api-server/dist
 COPY --from=builder /app/artifacts/api-server/package.json ./artifacts/api-server/package.json
 COPY --from=builder /app/artifacts/api-server/node_modules ./artifacts/api-server/node_modules
 
+# Create public and frontend directories
+RUN mkdir -p /app/public /app/artifacts/kanak-turnkey/dist/public
+
 # Copy compiled frontend React SPA static files
-COPY --from=builder /app/artifacts/kanak-turnkey/dist/public ./public
-COPY --from=builder /app/artifacts/kanak-turnkey/dist/public ./artifacts/kanak-turnkey/dist/public
+COPY --from=builder /app/artifacts/kanak-turnkey/dist/public/ /app/public/
+COPY --from=builder /app/artifacts/kanak-turnkey/dist/public/ /app/artifacts/kanak-turnkey/dist/public/
 
 # Setup persistent uploads directory
 RUN mkdir -p /app/uploads && chown -R node:node /app/uploads

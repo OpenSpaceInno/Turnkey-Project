@@ -102,44 +102,57 @@ app.get("/uploads/:filename", requireSessionForUploads, (req, res) => {
 app.use("/api", router);
 
 // ─── Serve Frontend in Production ─────────────────────────────────────────────
-const candidateDistPaths = [
-  path.resolve(process.cwd(), "public"),
-  path.resolve(process.cwd(), "artifacts/kanak-turnkey/dist/public"),
-  path.resolve(process.cwd(), "dist/public"),
-  path.resolve(__dirname, "../public"),
-  path.resolve(__dirname, "../../kanak-turnkey/dist/public"),
-];
+export function getFrontendDist(): string | null {
+  const candidateDistPaths = [
+    path.resolve(process.cwd(), "public"),
+    path.resolve(process.cwd(), "artifacts/kanak-turnkey/dist/public"),
+    path.resolve(process.cwd(), "dist/public"),
+    path.resolve(__dirname, "../public"),
+    path.resolve(__dirname, "../../kanak-turnkey/dist/public"),
+  ];
 
-const clientDistPath = candidateDistPaths.find((p) => {
-  try {
-    return fs.existsSync(p) && fs.existsSync(path.join(p, "index.html"));
-  } catch {
-    return false;
+  return (
+    candidateDistPaths.find((p) => {
+      try {
+        return fs.existsSync(p) && fs.existsSync(path.join(p, "index.html"));
+      } catch {
+        return false;
+      }
+    }) || null
+  );
+}
+
+const initialFrontendDist = getFrontendDist();
+if (initialFrontendDist) {
+  logger.info({ initialFrontendDist }, "Serving static frontend bundle from Express");
+  app.use(express.static(initialFrontendDist));
+} else {
+  logger.warn("Frontend static bundle directory (index.html) not found at startup; will check per-request");
+}
+
+// Explicit root handler
+app.get("/", (_req, res, next) => {
+  const dist = getFrontendDist();
+  if (dist) {
+    return res.sendFile(path.join(dist, "index.html"));
   }
+  next();
 });
 
-if (clientDistPath) {
-  logger.info({ clientDistPath }, "Serving static frontend bundle from Express");
-  app.use(express.static(clientDistPath));
-
-  // Explicit root handler
-  app.get("/", (_req, res) => {
-    res.sendFile(path.join(clientDistPath, "index.html"));
-  });
-
-  // Express 5 SPA catch-all middleware for client-side routing
-  app.use((req, res, next) => {
-    if (req.method !== "GET" && req.method !== "HEAD") {
-      return next();
-    }
-    if (req.path.startsWith("/api") || req.path.startsWith("/uploads")) {
-      return next();
-    }
-    res.sendFile(path.join(clientDistPath, "index.html"));
-  });
-} else {
-  logger.warn("Frontend static bundle directory (index.html) not found in candidate paths");
-}
+// Express 5 SPA catch-all middleware for client-side routing
+app.use((req, res, next) => {
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    return next();
+  }
+  if (req.path.startsWith("/api") || req.path.startsWith("/uploads")) {
+    return next();
+  }
+  const dist = getFrontendDist();
+  if (dist) {
+    return res.sendFile(path.join(dist, "index.html"));
+  }
+  next();
+});
 
 // ─── Global Error Handler ─────────────────────────────────────────────────────
 app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
