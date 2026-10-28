@@ -101,6 +101,30 @@ app.get("/uploads/:filename", requireSessionForUploads, (req, res) => {
 // ─── Routes ───────────────────────────────────────────────────────────────────
 app.use("/api", router);
 
+// ─── Serve Frontend in Production ─────────────────────────────────────────────
+const candidateDistPaths = [
+  path.resolve(process.cwd(), "artifacts/kanak-turnkey/dist/public"),
+  path.resolve(process.cwd(), "dist/public"),
+  path.resolve(process.cwd(), "public"),
+  path.resolve(__dirname, "../../kanak-turnkey/dist/public"),
+  path.resolve(__dirname, "../public"),
+];
+
+const clientDistPath = candidateDistPaths.find((p) => fs.existsSync(p));
+
+if (clientDistPath) {
+  logger.info({ clientDistPath }, "Serving static frontend bundle from Express");
+  app.use(express.static(clientDistPath));
+
+  app.get("*", (req, res, next) => {
+    // Skip if path is an API endpoint or uploaded media
+    if (req.path.startsWith("/api") || req.path.startsWith("/uploads")) {
+      return next();
+    }
+    res.sendFile(path.join(clientDistPath, "index.html"));
+  });
+}
+
 // ─── Global Error Handler ─────────────────────────────────────────────────────
 app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
   logger.error({ err, url: req.url, method: req.method }, "Unhandled server error");
