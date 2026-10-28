@@ -44,6 +44,7 @@ COPY --from=builder /app/artifacts/api-server/package.json ./artifacts/api-serve
 COPY --from=builder /app/artifacts/api-server/node_modules ./artifacts/api-server/node_modules
 
 # Copy compiled frontend React SPA static files
+COPY --from=builder /app/artifacts/kanak-turnkey/dist/public ./public
 COPY --from=builder /app/artifacts/kanak-turnkey/dist/public ./artifacts/kanak-turnkey/dist/public
 
 # Setup persistent uploads directory
