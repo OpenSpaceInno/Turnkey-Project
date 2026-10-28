@@ -48,6 +48,9 @@ app.use(cors({
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
+// Trust reverse proxy (Coolify/Traefik/Nginx)
+app.set("trust proxy", 1);
+
 // ─── Session — SESSION_SECRET must be set in production ───────────────────────
 const sessionKey = process.env.SESSION_SECRET;
 if (!sessionKey && process.env.NODE_ENV === "production") {
@@ -64,7 +67,7 @@ app.use(
     maxAge: 24 * 60 * 60 * 1000,
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: process.env.COOKIE_SECURE === "true",
   })
 );
 

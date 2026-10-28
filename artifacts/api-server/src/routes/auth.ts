@@ -230,7 +230,10 @@ router.post("/auth/login", loginRateLimiter, async (req, res): Promise<void> => 
     res.json(formatUserResponse(user));
   } catch (error: any) {
     console.error("Login error:", error);
-    res.status(500).json({ error: "An error occurred during login" });
+    res.status(500).json({
+      error: "An error occurred during login",
+      details: error?.message || String(error),
+    });
   }
 });
 
