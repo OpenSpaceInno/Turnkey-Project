@@ -7,14 +7,17 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Force development during build stage so devDependencies (Vite, Rollup, TS) are fully installed
+ENV NODE_ENV=development
+
 # Enable pnpm
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
 # Copy repository files (filtered by .dockerignore)
 COPY . .
 
-# Install dependencies across all workspace packages
-RUN pnpm install --frozen-lockfile
+# Install all dependencies including devDependencies across Linux & Windows
+RUN pnpm install --prod=false
 
 # Build Backend API Server and Frontend React SPA
 RUN pnpm --filter @workspace/api-server run build

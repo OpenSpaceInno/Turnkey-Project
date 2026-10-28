@@ -41,7 +41,6 @@
     "@replit/vite-plugin-cartographer": "catalog:",
     "@replit/vite-plugin-dev-banner": "catalog:",
     "@replit/vite-plugin-runtime-error-modal": "catalog:",
-    "@rollup/rollup-win32-x64-msvc": "^4.62.4",
     "@tailwindcss/typography": "^0.5.15",
     "@tailwindcss/vite": "catalog:",
     "@tanstack/react-query": "catalog:",
@@ -74,5 +73,10 @@
     "vite": "catalog:",
     "wouter": "^3.3.5",
     "zod": "catalog:"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-linux-x64-musl": "^4.59.0",
+    "@rollup/rollup-linux-x64-gnu": "^4.59.0",
+    "@rollup/rollup-win32-x64-msvc": "^4.62.4"
   }
 }
