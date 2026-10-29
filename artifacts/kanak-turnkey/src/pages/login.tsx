@@ -174,7 +174,10 @@ export default function LoginPage() {
       }
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to send mobile OTP");
+        const errorText = data.details
+          ? `${data.error}: ${data.details}`
+          : (data.error || "Failed to send mobile OTP");
+        throw new Error(errorText);
       }
 
       setOtpSent(true);
@@ -287,7 +290,10 @@ export default function LoginPage() {
       }
 
       if (!response.ok) {
-        throw new Error(data.error || "Invalid email or password");
+        const errorText = data.details
+          ? `${data.error}: ${data.details}`
+          : (data.error || "Invalid email or password");
+        throw new Error(errorText);
       }
 
       if (data.requires2FA) {

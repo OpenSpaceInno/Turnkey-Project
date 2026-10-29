@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import crypto from "crypto";
-import { db, pool, usersTable, auditLogsTable } from "@workspace/db";
+import { db, pool, usersTable, auditLogsTable, getSanitizedDbInfo } from "@workspace/db";
 import { eq, and, gt } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { ROLE_PERMISSIONS, PERMISSIONS } from "../lib/permissions";
@@ -369,9 +369,20 @@ router.post("/auth/login", loginRateLimiter, async (req, res): Promise<void> => 
     res.json(formatUserResponse(user));
   } catch (error: any) {
     logger.error({ err: error, stack: error?.stack }, "Login error");
-    res.status(400).json({
-      error: error?.message || "Invalid email, mobile number, or password",
-      details: error?.cause?.message || error?.sqlMessage || error?.message || String(error),
+    const dbInfo = getSanitizedDbInfo();
+    const isConnErr =
+      error?.code === "ECONNREFUSED" ||
+      error?.code === "ETIMEDOUT" ||
+      error?.code === "ENOTFOUND" ||
+      error?.code === "ER_ACCESS_DENIED_ERROR" ||
+      error?.message?.includes("connect ECONNREFUSED") ||
+      error?.message?.includes("connect ETIMEDOUT");
+
+    res.status(isConnErr ? 503 : 400).json({
+      error: isConnErr ? "Database Connection Failed" : (error?.message || "Invalid email, mobile number, or password"),
+      details: isConnErr
+        ? `Cannot connect to MySQL database at '${dbInfo.host}:${dbInfo.port}' (${error?.code || error?.message}). Please check DATABASE_URL in Coolify Environment Variables.`
+        : (error?.cause?.message || error?.sqlMessage || error?.message || String(error)),
     });
   }
 });

@@ -1,12 +1,11 @@
 import { Router, type IRouter } from "express";
-import { HealthCheckResponse } from "@workspace/api-zod";
-
 import fs from "fs";
 import path from "path";
+import { pool, getSanitizedDbInfo } from "@workspace/db";
 
 const router: IRouter = Router();
 
-router.get(["/health", "/healthz"], (_req, res) => {
+router.get(["/health", "/healthz"], async (_req, res) => {
   const candidateDistPaths = [
     path.resolve(process.cwd(), "public"),
     path.resolve(process.cwd(), "artifacts/kanak-turnkey/dist/public"),
@@ -40,8 +39,41 @@ router.get(["/health", "/healthz"], (_req, res) => {
     rootFiles = [e.message];
   }
 
+  // Live Database Connectivity Probe
+  let dbStatus = "unknown";
+  let dbLatencyMs: number | null = null;
+  let dbError: any = null;
+
+  try {
+    const start = Date.now();
+    await pool.query("SELECT 1 AS ping;");
+    dbLatencyMs = Date.now() - start;
+    dbStatus = "connected";
+  } catch (err: any) {
+    dbStatus = "disconnected";
+    dbError = {
+      message: err.message,
+      code: err.code || "UNKNOWN",
+      errno: err.errno,
+      syscall: err.syscall,
+      address: err.address,
+      port: err.port,
+    };
+  }
+
+  const dbInfo = getSanitizedDbInfo();
+
   res.json({
-    status: "ok",
+    status: dbStatus === "connected" ? "ok" : "degraded",
+    database: {
+      status: dbStatus,
+      targetHost: dbInfo.host,
+      targetPort: dbInfo.port,
+      targetDatabase: dbInfo.database,
+      targetUser: dbInfo.user,
+      latencyMs: dbLatencyMs,
+      error: dbError,
+    },
     timestamp: new Date().toISOString(),
     cwd: process.cwd(),
     frontendDist: foundDist,

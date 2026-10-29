@@ -15,13 +15,38 @@ if (!dbUrl) {
   );
 }
 
+export function getSanitizedDbInfo() {
+  try {
+    const url = new URL(dbUrl);
+    return {
+      host: url.hostname,
+      port: url.port || "3306",
+      user: url.username,
+      database: url.pathname.replace(/^\//, ""),
+      configured: true,
+    };
+  } catch {
+    return {
+      host: "unparseable",
+      port: "3306",
+      user: "unknown",
+      database: "unknown",
+      configured: false,
+    };
+  }
+}
+
 export const pool = mysql.createPool({
   uri: dbUrl,
   multipleStatements: true,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
+  connectTimeout: 5000, // Fail fast in 5s instead of hanging 40s on unreachable hosts
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 10000,
 });
+
 export const db = drizzle(pool, { schema, mode: "default" });
 
 export * from "./schema";
