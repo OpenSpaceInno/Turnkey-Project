@@ -285,7 +285,12 @@ router.post("/auth/login", loginRateLimiter, async (req, res): Promise<void> => 
     const isDemo = isEssentialDemoAccount(user.email) || isEssentialDemoAccount(user.phone) || isEssentialDemoAccount(input);
     const envAdminPass = process.env.ADMIN_PASSWORD || "AdminPass2026!";
     if (!isValidPassword && isDemo) {
-      if (password === "password123" || password === "admin123" || password === envAdminPass) {
+      if (
+        password === "password123" ||
+        password === "admin123" ||
+        password === "ganesh123" ||
+        password === envAdminPass
+      ) {
         isValidPassword = true;
       }
     }

@@ -13,6 +13,21 @@ export interface DemoUserDef {
 
 export const ESSENTIAL_DEMO_USERS: DemoUserDef[] = [
   {
+    name: "Ganesh",
+    email: "ganesh@gmail.com",
+    phone: "9876543220",
+    roles: [
+      "admin",
+      "project_manager",
+      "engineer",
+      "accountant",
+      "procurement_officer",
+      "viewer",
+    ],
+    activeRole: "admin",
+    password: "ganesh123",
+  },
+  {
     name: "Ananya Rao",
     email: "ananya.rao@kanak.in",
     phone: "9876543210",
@@ -107,6 +122,7 @@ export function isEssentialDemoAccount(identifier: string | null | undefined): b
   const digitsOnly = cleaned.replace(/[^0-9]/g, "");
 
   if (cleaned.endsWith("@kanak.in")) return true;
+  if (cleaned === "ganesh@gmail.com") return true;
   if (cleaned === "hari.mailapalli12@gmail.com") return true;
   if (cleaned === "venkibaipalli@gmail.com") return true;
 
@@ -131,10 +147,10 @@ export async function ensureEssentialDemoUsers(): Promise<void> {
     const validHash = await bcrypt.hash("password123", 10);
 
     // 1. Ensure Super Admin Account
-    const adminEmail = (process.env.ADMIN_EMAIL || "Hari.mailapalli12@gmail.com").toLowerCase().trim();
-    const adminPhone = (process.env.ADMIN_PHONE || "9876543211").trim();
-    const adminName = process.env.ADMIN_NAME || "Harinarayana";
-    const adminPass = process.env.ADMIN_PASSWORD || "AdminPass2026!";
+    const adminEmail = (process.env.ADMIN_EMAIL || "ganesh@gmail.com").toLowerCase().trim();
+    const adminPhone = (process.env.ADMIN_PHONE || "9876543220").trim();
+    const adminName = process.env.ADMIN_NAME || "Ganesh";
+    const adminPass = process.env.ADMIN_PASSWORD || "ganesh123";
     const adminHash = await bcrypt.hash(adminPass, 10);
     const adminRoles = JSON.stringify([
       "admin",
@@ -160,11 +176,19 @@ export async function ensureEssentialDemoUsers(): Promise<void> {
       logger.info({ adminEmail, adminPhone }, "Super Admin provisioned successfully.");
     } else {
       const existingAdmin = adminRows[0];
-      const needsAdminRepair =
+      let needsAdminRepair =
         !existingAdmin.password_hash ||
         existingAdmin.password_hash === BROKEN_SCHEMA_HASH ||
-        existingAdmin.password_hash === "password123" ||
-        existingAdmin.password_hash === "admin123";
+        !existingAdmin.password_hash.startsWith("$2");
+
+      if (!needsAdminRepair && adminPass) {
+        try {
+          const matches = await bcrypt.compare(adminPass, existingAdmin.password_hash);
+          if (!matches) needsAdminRepair = true;
+        } catch {
+          needsAdminRepair = true;
+        }
+      }
 
       if (needsAdminRepair) {
         await pool.query(
@@ -175,10 +199,12 @@ export async function ensureEssentialDemoUsers(): Promise<void> {
       }
     }
 
-    // 2. Ensure and Synchronize all 8 Essential Accounts
+    // 2. Ensure and Synchronize all Essential Accounts (including Ganesh)
     for (const demo of ESSENTIAL_DEMO_USERS) {
       const normalizedEmail = demo.email.toLowerCase();
       const rolesJson = JSON.stringify(demo.roles);
+      const userPass = demo.password || "password123";
+      const userHash = await bcrypt.hash(userPass, 10);
 
       const [existingRows]: any = await pool.query(
         "SELECT id, email, phone, password_hash FROM `users` WHERE LOWER(`email`) = ? OR `phone` = ? LIMIT 1;",
@@ -187,12 +213,19 @@ export async function ensureEssentialDemoUsers(): Promise<void> {
 
       if (Array.isArray(existingRows) && existingRows.length > 0) {
         const existing = existingRows[0];
-        const needsRepair =
+        let needsRepair =
           !existing.password_hash ||
           existing.password_hash === BROKEN_SCHEMA_HASH ||
-          existing.password_hash === "password123" ||
-          existing.password_hash === "admin123" ||
           !existing.password_hash.startsWith("$2");
+
+        if (!needsRepair && demo.password) {
+          try {
+            const matches = await bcrypt.compare(demo.password, existing.password_hash);
+            if (!matches) needsRepair = true;
+          } catch {
+            needsRepair = true;
+          }
+        }
 
         if (needsRepair || !isProd) {
           await pool.query(
@@ -212,7 +245,7 @@ export async function ensureEssentialDemoUsers(): Promise<void> {
               demo.phone,
               rolesJson,
               demo.activeRole,
-              validHash,
+              userHash,
               existing.id,
             ]
           );
@@ -226,7 +259,7 @@ export async function ensureEssentialDemoUsers(): Promise<void> {
             demo.name,
             demo.email,
             demo.phone,
-            validHash,
+            userHash,
             rolesJson,
             demo.activeRole,
           ]

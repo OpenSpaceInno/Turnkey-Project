@@ -1632,7 +1632,8 @@ INSERT INTO `users` (`id`, `organization_id`, `name`, `email`, `phone`, `passwor
 (5, 1, 'Vikram Shah', 'vikram.shah@kanak.in', '9876543214', '$2b$10$30Dv.yPPXZb0YZRnngseEubrqOuKeNB4tUVDQN49txc6OsJT1oCj.', '["accountant", "viewer"]', 'accountant', 0, NOW(), NOW()),
 (6, 1, 'Neha Kapoor', 'neha.kapoor@kanak.in', '9876543215', '$2b$10$30Dv.yPPXZb0YZRnngseEubrqOuKeNB4tUVDQN49txc6OsJT1oCj.', '["procurement_officer", "viewer"]', 'procurement_officer', 0, NOW(), NOW()),
 (7, 1, 'Arjun Singh', 'arjun.singh@kanak.in', '9876543216', '$2b$10$30Dv.yPPXZb0YZRnngseEubrqOuKeNB4tUVDQN49txc6OsJT1oCj.', '["viewer"]', 'viewer', 0, NOW(), NOW()),
-(8, 1, 'Baipalli Venkateswara Rao', 'venkibaipalli@gmail.com', '9876543217', '$2b$10$30Dv.yPPXZb0YZRnngseEubrqOuKeNB4tUVDQN49txc6OsJT1oCj.', '["admin", "project_manager", "engineer", "accountant", "procurement_officer", "viewer"]', 'admin', 0, NOW(), NOW())
+(8, 1, 'Baipalli Venkateswara Rao', 'venkibaipalli@gmail.com', '9876543217', '$2b$10$30Dv.yPPXZb0YZRnngseEubrqOuKeNB4tUVDQN49txc6OsJT1oCj.', '["admin", "project_manager", "engineer", "accountant", "procurement_officer", "viewer"]', 'admin', 0, NOW(), NOW()),
+(9, 1, 'Ganesh', 'ganesh@gmail.com', '9876543220', '$2b$10$rVDVEE1xTpUDKJzzDxgHyuCYS0jBT38ZZf9SSGNoaxR3Sff4i3KXq', '["admin", "project_manager", "engineer", "accountant", "procurement_officer", "viewer"]', 'admin', 0, NOW(), NOW())
 ON DUPLICATE KEY UPDATE `password_hash` = VALUES(`password_hash`), `phone` = VALUES(`phone`), `roles` = VALUES(`roles`), `active_role` = VALUES(`active_role`), `two_factor_enabled` = 0;
 
 DROP TABLE IF EXISTS `vendor_invoices`;
