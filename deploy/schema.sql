@@ -1622,6 +1622,19 @@ CREATE TABLE `users` (
   UNIQUE KEY `users_phone_unique` (`phone`)
 ) ENGINE=InnoDB AUTO_INCREMENT=25 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+-- ─── Pre-seeded Essential Demo Accounts (Default Password: password123) ───
+INSERT INTO `users` (`id`, `organization_id`, `name`, `email`, `phone`, `password_hash`, `roles`, `active_role`, `two_factor_enabled`, `created_at`, `updated_at`) VALUES
+(1, 1, 'Ananya Rao', 'ananya.rao@kanak.in', '9876543210', '$2b$10$k1m5jKhqAJAxzwNwcGJ8E.vptrmGRth79.Ai/.SeOSJIDz2HyedYu', '["admin", "project_manager", "engineer", "accountant", "procurement_officer", "viewer"]', 'admin', 0, NOW(), NOW()),
+(2, 1, 'Harinarayana', 'Hari.mailapalli12@gmail.com', '9876543211', '$2b$10$k1m5jKhqAJAxzwNwcGJ8E.vptrmGRth79.Ai/.SeOSJIDz2HyedYu', '["admin", "project_manager", "engineer", "accountant", "procurement_officer", "viewer"]', 'project_manager', 0, NOW(), NOW()),
+(3, 1, 'Rohan Mehta', 'rohan.mehta@kanak.in', '9876543212', '$2b$10$k1m5jKhqAJAxzwNwcGJ8E.vptrmGRth79.Ai/.SeOSJIDz2HyedYu', '["project_manager", "viewer"]', 'project_manager', 0, NOW(), NOW()),
+(4, 1, 'Priya Iyer', 'priya.iyer@kanak.in', '9876543213', '$2b$10$k1m5jKhqAJAxzwNwcGJ8E.vptrmGRth79.Ai/.SeOSJIDz2HyedYu', '["engineer", "viewer"]', 'engineer', 0, NOW(), NOW()),
+(5, 1, 'Vikram Shah', 'vikram.shah@kanak.in', '9876543214', '$2b$10$k1m5jKhqAJAxzwNwcGJ8E.vptrmGRth79.Ai/.SeOSJIDz2HyedYu', '["accountant", "viewer"]', 'accountant', 0, NOW(), NOW()),
+(6, 1, 'Neha Kapoor', 'neha.kapoor@kanak.in', '9876543215', '$2b$10$k1m5jKhqAJAxzwNwcGJ8E.vptrmGRth79.Ai/.SeOSJIDz2HyedYu', '["procurement_officer", "viewer"]', 'procurement_officer', 0, NOW(), NOW()),
+(7, 1, 'Arjun Singh', 'arjun.singh@kanak.in', '9876543216', '$2b$10$k1m5jKhqAJAxzwNwcGJ8E.vptrmGRth79.Ai/.SeOSJIDz2HyedYu', '["viewer"]', 'viewer', 0, NOW(), NOW()),
+(8, 1, 'Baipalli Venkateswara Rao', 'venkibaipalli@gmail.com', '9876543217', '$2b$10$k1m5jKhqAJAxzwNwcGJ8E.vptrmGRth79.Ai/.SeOSJIDz2HyedYu', '["admin", "project_manager", "engineer", "accountant", "procurement_officer", "viewer"]', 'admin', 0, NOW(), NOW())
+ON DUPLICATE KEY UPDATE `password_hash` = VALUES(`password_hash`), `phone` = VALUES(`phone`), `roles` = VALUES(`roles`), `active_role` = VALUES(`active_role`), `two_factor_enabled` = 0;
+
 DROP TABLE IF EXISTS `vendor_invoices`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;

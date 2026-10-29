@@ -12,18 +12,18 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Shield,
-  ShieldAlert,
   ArrowLeft,
   Mail,
   Lock,
-  ExternalLink,
+  Eye,
+  EyeOff,
   KeyRound,
   CheckCircle2,
-  Sparkles,
   Smartphone,
   SmartphoneNfc,
   Send,
@@ -32,9 +32,6 @@ import {
   RefreshCw,
   HardHat,
   UserCheck,
-  Phone,
-  ArrowRight,
-  Radio,
   QrCode,
   Copy,
   Check,
@@ -45,18 +42,20 @@ export default function LoginPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Primary Auth Tab: "mobile" (Site PWA) | "email" (Corporate / Enterprise)
-  const [authMethod, setAuthMethod] = useState<"mobile" | "email">("mobile");
+  // Primary Auth Tab: "email" (Corporate / Enterprise) | "mobile" (Site Execution PWA)
+  const [authMethod, setAuthMethod] = useState<"email" | "mobile">("email");
 
   // Mode state for secondary challenges: "standard" | "forgot" | "2fa"
   const [mode, setMode] = useState<"standard" | "forgot" | "2fa">("standard");
 
-  // General Loading
+  // General Loading State
   const [isLoading, setIsLoading] = useState(false);
 
   // Email / Password Form State
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
 
   // Mobile PWA Form State
   const [phone, setPhone] = useState("");
@@ -66,8 +65,6 @@ export default function LoginPage() {
   const [mobileUserData, setMobileUserData] = useState<{
     userName?: string;
     userRole?: string;
-    maskedPhone?: string;
-    devOtp?: string;
   } | null>(null);
 
   // PWA & Network State
@@ -78,6 +75,7 @@ export default function LoginPage() {
   // Phone QR Code Dialog
   const [qrModalOpen, setQrModalOpen] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
+  const currentOrigin = typeof window !== "undefined" ? window.location.origin : "";
 
   // 2FA state for Corporate Email logins
   const [twoFactorData, setTwoFactorData] = useState<{ tempToken: string; email: string } | null>(null);
@@ -141,21 +139,21 @@ export default function LoginPage() {
       setInstallPrompt(null);
       toast({
         title: "PWA Installed",
-        description: "Kanak Turnkey is now installed on your mobile home screen.",
+        description: "Kanak Turnkey is now installed on your device.",
       });
     }
   };
 
   // -------------------------------------------------------------
-  // Mobile PWA Auth Handlers
+  // Mobile PWA Auth Handlers (Site Staff)
   // -------------------------------------------------------------
-  const handleSendMobileOtp = async (customPhone?: string) => {
-    const targetPhone = (customPhone || phone).trim();
-    if (!targetPhone) {
+  const handleSendMobileOtp = async () => {
+    const cleanPhone = phone.trim();
+    if (!cleanPhone || cleanPhone.length < 10) {
       toast({
         variant: "destructive",
-        title: "Mobile Number Required",
-        description: "Please enter your 10-digit mobile phone number.",
+        title: "Invalid Mobile Number",
+        description: "Please enter a valid 10-digit registered mobile number.",
       });
       return;
     }
@@ -165,7 +163,7 @@ export default function LoginPage() {
       const response = await fetch("/api/auth/mobile/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: targetPhone }),
+        body: JSON.stringify({ phone: cleanPhone }),
       });
 
       const data = await response.json();
@@ -174,25 +172,22 @@ export default function LoginPage() {
       }
 
       setOtpSent(true);
-      setPhone(data.phone || targetPhone);
-      setOtp(data.devOtp || "");
-      setOtpCountdown(30);
+      setPhone(data.phone || cleanPhone);
+      setOtp("");
+      setOtpCountdown(45);
       setMobileUserData({
         userName: data.userName,
         userRole: data.userRole,
-        devOtp: data.devOtp,
       });
 
       toast({
-        title: "OTP Sent Successfully",
-        description: data.devOtp
-          ? `Verification code is ${data.devOtp} (Auto-filled for testing)`
-          : `6-digit OTP sent to +91 ${data.phone}`,
+        title: "Verification Code Sent",
+        description: `A 6-digit OTP has been sent to +91 ${data.phone || cleanPhone}.`,
       });
     } catch (err: any) {
       toast({
         variant: "destructive",
-        title: "Failed to Send OTP",
+        title: "OTP Delivery Failed",
         description: err.message || "Please check your mobile number and try again.",
       });
     } finally {
@@ -202,11 +197,12 @@ export default function LoginPage() {
 
   const handleVerifyMobileOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phone || !otp.trim()) {
+    const cleanCode = otp.trim();
+    if (!phone || cleanCode.length < 6) {
       toast({
         variant: "destructive",
         title: "Incomplete Code",
-        description: "Please enter the 6-digit OTP sent to your phone.",
+        description: "Please enter the complete 6-digit verification code.",
       });
       return;
     }
@@ -216,53 +212,19 @@ export default function LoginPage() {
       const response = await fetch("/api/auth/mobile/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: phone.trim(), otp: otp.trim() }),
+        body: JSON.stringify({ phone: phone.trim(), otp: cleanCode }),
         credentials: "include",
       });
 
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || "Invalid OTP code");
+        throw new Error(data.error || "Invalid or expired OTP code.");
       }
 
       await queryClient.invalidateQueries();
 
       toast({
-        title: "Mobile Sign-in Verified",
-        description: `Welcome back, ${data.name || "Site Engineer"}!`,
-      });
-
-      setLocation("/");
-    } catch (err: any) {
-      toast({
-        variant: "destructive",
-        title: "Verification Failed",
-        description: err.message || "Invalid or expired OTP code.",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleQuickMobileLogin = async (targetPhone: string) => {
-    setIsLoading(true);
-    try {
-      const response = await fetch("/api/auth/mobile/quick-login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: targetPhone }),
-        credentials: "include",
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "Fast mobile login failed");
-      }
-
-      await queryClient.invalidateQueries();
-
-      toast({
-        title: "Mobile Login Successful",
+        title: "Authentication Successful",
         description: `Welcome back, ${data.name}!`,
       });
 
@@ -270,8 +232,8 @@ export default function LoginPage() {
     } catch (err: any) {
       toast({
         variant: "destructive",
-        title: "Login Failed",
-        description: err.message || "Could not log in with mobile number.",
+        title: "Verification Failed",
+        description: err.message || "Invalid or expired OTP code. Please try again.",
       });
     } finally {
       setIsLoading(false);
@@ -279,23 +241,36 @@ export default function LoginPage() {
   };
 
   // -------------------------------------------------------------
-  // Standard Email / Password Auth Handlers
+  // Standard Corporate Email & Password Auth Handlers
   // -------------------------------------------------------------
-  const performEmailLogin = async (loginEmail: string, loginPassword?: string) => {
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanEmail = email.trim();
+    const cleanPassword = password.trim();
+
+    if (!cleanEmail || !cleanPassword) {
+      toast({
+        variant: "destructive",
+        title: "Missing Credentials",
+        description: "Please enter both your email address and password.",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: loginEmail, password: loginPassword || "password123" }),
+        body: JSON.stringify({ email: cleanEmail, password: cleanPassword }),
         credentials: "include",
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Login failed");
+        throw new Error(data.error || "Invalid email or password");
       }
 
       if (data.requires2FA) {
@@ -303,8 +278,8 @@ export default function LoginPage() {
         setTwoFactorCode("");
         setMode("2fa");
         toast({
-          title: "Two-Factor Authentication Required",
-          description: "Please enter your 6-digit authenticator code or backup recovery code.",
+          title: "Two-Factor Verification Required",
+          description: "Please enter the 6-digit code from your authenticator app.",
         });
         return;
       }
@@ -313,7 +288,7 @@ export default function LoginPage() {
 
       toast({
         title: "Login Successful",
-        description: "Welcome back!",
+        description: `Welcome back, ${data.name}!`,
       });
 
       setLocation("/");
@@ -321,16 +296,11 @@ export default function LoginPage() {
       toast({
         variant: "destructive",
         title: "Login Failed",
-        description: error.message || "Invalid email, phone, or password",
+        description: error.message || "Invalid email or password",
       });
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleEmailLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await performEmailLogin(email, password);
   };
 
   const handleVerify2FA = async (e: React.FormEvent) => {
@@ -351,22 +321,22 @@ export default function LoginPage() {
 
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || "Invalid 2FA code.");
+        throw new Error(data.error || "Invalid two-factor code");
       }
 
       await queryClient.invalidateQueries();
 
       toast({
-        title: "Authentication Verified",
-        description: "Welcome back!",
+        title: "Identity Verified",
+        description: "Two-factor authentication successful.",
       });
 
       setLocation("/");
-    } catch (error: any) {
+    } catch (err: any) {
       toast({
         variant: "destructive",
         title: "Verification Failed",
-        description: error.message || "Invalid authenticator code or backup recovery code.",
+        description: err.message || "The code entered is invalid or has expired.",
       });
     } finally {
       setIsLoading(false);
@@ -375,11 +345,16 @@ export default function LoginPage() {
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!forgotEmail.trim()) return;
+    if (!forgotEmail.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Email Required",
+        description: "Please enter your registered email address.",
+      });
+      return;
+    }
 
     setForgotLoading(true);
-    setForgotResult(null);
-
     try {
       const response = await fetch("/api/auth/forgot-password", {
         method: "POST",
@@ -389,55 +364,37 @@ export default function LoginPage() {
 
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || "Failed to submit request.");
+        throw new Error(data.error || "Failed to process request");
       }
 
       setForgotResult(data);
       toast({
-        title: "Password Reset Requested",
-        description: data.message || "Reset link generated.",
+        title: "Request Received",
+        description: data.message || "Password recovery instructions have been processed.",
       });
-    } catch (error: any) {
+    } catch (err: any) {
       toast({
         variant: "destructive",
         title: "Request Failed",
-        description: error.message || "Could not process password reset request.",
+        description: err.message || "Failed to send password reset instructions.",
       });
     } finally {
       setForgotLoading(false);
     }
   };
 
-  // Demo users for quick testing
-  const DEMO_MOBILE_USERS = [
-    { name: "Priya Iyer", role: "Site Engineer", phone: "9876543213", displayPhone: "+91 98765 43213", badge: "Site Execution" },
-    { name: "Rohan Mehta", role: "Project Manager", phone: "9876543212", displayPhone: "+91 98765 43212", badge: "Operations" },
-    { name: "Harinarayana", role: "Project Manager", phone: "9876543211", displayPhone: "+91 98765 43211", badge: "Site PM" },
-    { name: "Ananya Rao", role: "Admin", phone: "9876543210", displayPhone: "+91 98765 43210", badge: "Full Access" },
-  ];
-
-  const DEMO_EMAIL_USERS = [
-    { name: "Ananya Rao", email: "ananya.rao@kanak.in", role: "Admin" },
-    { name: "Harinarayana", email: "Hari.mailapalli12@gmail.com", role: "Project Manager" },
-    { name: "Priya Iyer", email: "priya.iyer@kanak.in", role: "Site Engineer" },
-    { name: "Vikram Shah", email: "vikram.shah@kanak.in", role: "Accountant" },
-    { name: "Neha Kapoor", email: "neha.kapoor@kanak.in", role: "Procurement Officer" },
-  ];
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-zinc-950 p-3 sm:p-4 text-foreground selection:bg-primary selection:text-white">
       <Card className="w-full max-w-md shadow-2xl border-border/40 backdrop-blur-md bg-card/95 overflow-hidden rounded-2xl">
         {/* PWA App Mode & Network Alerts */}
         <div className="px-5 pt-4 pb-0 space-y-2">
-          {/* Offline warning banner */}
           {!isOnline && (
             <div className="p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2">
               <WifiOff className="w-4 h-4 shrink-0 text-amber-400" />
-              <span>Offline Mode Active. PWA cached session & local storage enabled.</span>
+              <span>Offline Mode Active. Cached local storage is enabled.</span>
             </div>
           )}
 
-          {/* Standalone PWA Badge or Install PWA Header & Phone QR Code */}
           <div className="flex items-center justify-between gap-2">
             {isStandalone ? (
               <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 font-medium">
@@ -467,12 +424,12 @@ export default function LoginPage() {
               className="h-7 text-[11px] gap-1.5 border-amber-500/30 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
             >
               <QrCode className="w-3.5 h-3.5 text-amber-400" />
-              <span>Scan QR for Phone</span>
+              <span>Scan for Phone</span>
             </Button>
           </div>
         </div>
 
-        {/* Card Header */}
+        {/* Brand Card Header */}
         <CardHeader className="space-y-1 text-center pt-3 pb-3">
           <div className="flex items-center justify-center mb-2">
             <div className="relative">
@@ -490,14 +447,14 @@ export default function LoginPage() {
               ? "Reset Password"
               : mode === "2fa"
               ? "Two-Factor Verification"
-              : "Kanak Turnkey PWA"}
+              : "Kanak Turnkey"}
           </CardTitle>
           <CardDescription className="text-xs">
             {mode === "forgot"
-              ? "Enter your email to receive recovery instructions"
+              ? "Enter your corporate email to receive recovery instructions"
               : mode === "2fa"
               ? `Verification code sent to ${twoFactorData?.email}`
-              : "Site Execution & Enterprise Construction Platform"}
+              : "Enterprise Construction Management & Site Execution Platform"}
           </CardDescription>
         </CardHeader>
 
@@ -534,7 +491,7 @@ export default function LoginPage() {
                   autoFocus
                   autoComplete="one-time-code"
                   disabled={isLoading}
-                  className="text-center font-mono text-lg tracking-widest h-11"
+                  className="text-center font-mono text-lg tracking-widest h-11 rounded-xl"
                 />
               </div>
 
@@ -551,7 +508,7 @@ export default function LoginPage() {
                 </button>
               </div>
 
-              <Button type="submit" className="w-full h-10 gap-2 shadow-md" disabled={isLoading || !twoFactorCode.trim()}>
+              <Button type="submit" className="w-full h-10 gap-2 shadow-md rounded-xl font-bold text-xs" disabled={isLoading || !twoFactorCode.trim()}>
                 {isLoading ? "Verifying..." : "Verify & Sign In"}
               </Button>
 
@@ -580,14 +537,14 @@ export default function LoginPage() {
                   <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-foreground space-y-2">
                     <div className="flex items-center gap-2 text-emerald-500 font-semibold text-xs">
                       <CheckCircle2 className="w-4 h-4 shrink-0" />
-                      <span>Password Reset Link Ready</span>
+                      <span>Password Reset Link Generated</span>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Reset link generated for <strong>{forgotEmail}</strong>.
+                      Reset link is ready for <strong>{forgotEmail}</strong>.
                     </p>
                     <Button
                       onClick={() => setLocation(forgotResult.resetUrl!)}
-                      className="w-full h-9 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs mt-2"
+                      className="w-full h-9 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs mt-2 rounded-xl"
                     >
                       <KeyRound className="w-3.5 h-3.5" /> Open Password Reset Page
                     </Button>
@@ -599,7 +556,7 @@ export default function LoginPage() {
                       setForgotResult(null);
                       setMode("standard");
                     }}
-                    className="w-full text-xs h-9"
+                    className="w-full text-xs h-9 rounded-xl"
                   >
                     <ArrowLeft className="w-3.5 h-3.5 mr-1" /> Return to Login
                   </Button>
@@ -607,7 +564,7 @@ export default function LoginPage() {
               ) : (
                 <form onSubmit={handleForgotPassword} className="space-y-3.5">
                   <div className="space-y-1.5">
-                    <Label htmlFor="forgotEmail" className="text-xs">Email Address</Label>
+                    <Label htmlFor="forgotEmail" className="text-xs">Corporate Email Address</Label>
                     <Input
                       id="forgotEmail"
                       type="email"
@@ -617,14 +574,14 @@ export default function LoginPage() {
                       required
                       autoFocus
                       disabled={forgotLoading}
-                      className="h-10 text-xs"
+                      className="h-10 text-xs rounded-xl"
                     />
                     <p className="text-[11px] text-muted-foreground">
                       We'll generate a secure password reset link valid for 1 hour.
                     </p>
                   </div>
 
-                  <Button type="submit" className="w-full h-10 gap-2 shadow-md text-xs" disabled={forgotLoading || !forgotEmail.trim()}>
+                  <Button type="submit" className="w-full h-10 gap-2 shadow-md text-xs font-bold rounded-xl" disabled={forgotLoading || !forgotEmail.trim()}>
                     {forgotLoading ? (
                       "Sending Reset Instructions..."
                     ) : (
@@ -651,12 +608,24 @@ export default function LoginPage() {
           )}
 
           {/* ======================================================== */}
-          {/* MODE: STANDARD LOGIN (MOBILE PWA OTP / EMAIL) */}
+          {/* MODE: STANDARD LOGIN (EMAIL OR MOBILE PWA OTP)           */}
           {/* ======================================================== */}
           {mode === "standard" && (
             <div className="space-y-4">
-              {/* Auth Method Segmented Control */}
+              {/* Segmented Auth Selector */}
               <div className="grid grid-cols-2 p-1 bg-muted/60 rounded-xl border border-border/50 text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setAuthMethod("email")}
+                  className={`flex items-center justify-center gap-1.5 py-2 rounded-lg transition-all ${
+                    authMethod === "email"
+                      ? "bg-card text-foreground shadow-sm border border-border/80 font-bold"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Mail className="w-3.5 h-3.5 text-primary" />
+                  <span>Corporate Email</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => {
@@ -671,24 +640,105 @@ export default function LoginPage() {
                   }`}
                 >
                   <Smartphone className="w-3.5 h-3.5 text-primary" />
-                  <span>Mobile OTP (Site)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAuthMethod("email")}
-                  className={`flex items-center justify-center gap-1.5 py-2 rounded-lg transition-all ${
-                    authMethod === "email"
-                      ? "bg-card text-foreground shadow-sm border border-border/80 font-bold"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <Mail className="w-3.5 h-3.5 text-primary" />
-                  <span>Email & Password</span>
+                  <span>Site Mobile OTP</span>
                 </button>
               </div>
 
               {/* ──────────────────────────────────────────────────────── */}
-              {/* TAB 1: MOBILE PWA OTP LOGIN (SITE EXECUTION)            */}
+              {/* TAB 1: CORPORATE EMAIL & PASSWORD                         */}
+              {/* ──────────────────────────────────────────────────────── */}
+              {authMethod === "email" && (
+                <form onSubmit={handleEmailLogin} className="space-y-3.5">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="corporateEmail" className="text-xs font-semibold">
+                      Email Address
+                    </Label>
+                    <div className="relative">
+                      <Mail className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
+                      <Input
+                        id="corporateEmail"
+                        type="email"
+                        placeholder="user@kanak.in"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        autoFocus
+                        autoComplete="username"
+                        disabled={isLoading}
+                        className="h-10 text-xs pl-9 rounded-xl"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="corporatePassword" className="text-xs font-semibold">
+                        Password
+                      </Label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setForgotEmail(email);
+                          setMode("forgot");
+                        }}
+                        className="text-[11px] text-primary hover:underline font-medium"
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <Lock className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
+                      <Input
+                        id="corporatePassword"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        autoComplete="current-password"
+                        disabled={isLoading}
+                        className="h-10 text-xs pl-9 pr-9 rounded-xl"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground transition-colors"
+                        tabIndex={-1}
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2 pt-0.5">
+                    <Checkbox
+                      id="rememberMe"
+                      checked={rememberMe}
+                      onCheckedChange={(checked) => setRememberMe(!!checked)}
+                    />
+                    <Label htmlFor="rememberMe" className="text-xs text-muted-foreground cursor-pointer font-normal">
+                      Remember this workstation
+                    </Label>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full h-11 text-xs font-bold rounded-xl shadow-md bg-primary hover:bg-primary/90 text-primary-foreground transition-all mt-1"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <span className="flex items-center gap-2">
+                        <RefreshCw className="w-4 h-4 animate-spin" /> Signing In...
+                      </span>
+                    ) : (
+                      "Sign In to Platform"
+                    )}
+                  </Button>
+                </form>
+              )}
+
+              {/* ──────────────────────────────────────────────────────── */}
+              {/* TAB 2: SITE MOBILE PWA OTP                               */}
               {/* ──────────────────────────────────────────────────────── */}
               {authMethod === "mobile" && (
                 <div className="space-y-4">
@@ -696,7 +746,7 @@ export default function LoginPage() {
                     <div className="space-y-3.5">
                       <div className="space-y-1.5">
                         <Label htmlFor="mobilePhone" className="text-xs font-semibold flex items-center justify-between">
-                          <span>10-Digit Mobile Number</span>
+                          <span>10-Digit Registered Mobile</span>
                           <span className="text-[11px] text-muted-foreground font-normal">India (+91)</span>
                         </Label>
                         <div className="flex gap-2">
@@ -708,7 +758,7 @@ export default function LoginPage() {
                             type="tel"
                             inputMode="tel"
                             pattern="[0-9]*"
-                            placeholder="e.g. 9876543213"
+                            placeholder="e.g. 9876543210"
                             value={phone}
                             onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, "").slice(0, 10))}
                             autoFocus
@@ -717,7 +767,7 @@ export default function LoginPage() {
                           />
                         </div>
                         <p className="text-[11px] text-muted-foreground">
-                          Enter registered site mobile number to receive instant 6-digit OTP.
+                          Enter your mobile number to receive a secure one-time verification code.
                         </p>
                       </div>
 
@@ -732,48 +782,8 @@ export default function LoginPage() {
                         ) : (
                           <Send className="w-4 h-4" />
                         )}
-                        <span>{isLoading ? "Sending OTP..." : "Get 6-Digit OTP"}</span>
+                        <span>{isLoading ? "Sending Code..." : "Send Verification Code"}</span>
                       </Button>
-
-                      {/* Quick 1-Tap Mobile Access for Site Workers */}
-                      <div className="pt-2 border-t border-border/60 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                            <Sparkles className="w-3 h-3 text-amber-500" /> Quick 1-Tap Mobile Logins
-                          </span>
-                          <span className="text-[10px] text-muted-foreground">Site Demo</span>
-                        </div>
-                        <div className="grid grid-cols-1 gap-1.5">
-                          {DEMO_MOBILE_USERS.map((u) => (
-                            <button
-                              key={u.phone}
-                              type="button"
-                              disabled={isLoading}
-                              onClick={() => {
-                                setPhone(u.phone);
-                                handleQuickMobileLogin(u.phone);
-                              }}
-                              className="flex items-center justify-between p-2 rounded-xl border border-border/60 hover:border-primary/50 hover:bg-accent/40 transition-all text-left text-xs disabled:opacity-50"
-                            >
-                              <div className="flex items-center gap-2">
-                                <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
-                                  {u.name[0]}
-                                </div>
-                                <div>
-                                  <div className="font-semibold text-foreground leading-tight">{u.name}</div>
-                                  <div className="text-muted-foreground text-[10px] font-mono">{u.displayPhone}</div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-1.5">
-                                <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 bg-muted/60 font-medium">
-                                  {u.role}
-                                </Badge>
-                                <ArrowRight className="w-3 h-3 text-muted-foreground" />
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
                     </div>
                   ) : (
                     /* OTP Verification Screen */
@@ -801,14 +811,6 @@ export default function LoginPage() {
                             <span>Signing in as <strong>{mobileUserData.userName}</strong> ({mobileUserData.userRole})</span>
                           </div>
                         )}
-                        {mobileUserData?.devOtp && (
-                          <div className="pt-1 flex items-center gap-1.5">
-                            <Badge variant="outline" className="text-[10px] bg-amber-500/10 border-amber-500/30 text-amber-400">
-                              Demo Code: {mobileUserData.devOtp}
-                            </Badge>
-                            <span className="text-[10px] text-muted-foreground">(Auto-filled)</span>
-                          </div>
-                        )}
                       </div>
 
                       <div className="space-y-1.5">
@@ -820,7 +822,7 @@ export default function LoginPage() {
                           type="text"
                           inputMode="numeric"
                           pattern="[0-9]*"
-                          placeholder="123456"
+                          placeholder="000000"
                           value={otp}
                           onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
                           required
@@ -873,98 +875,15 @@ export default function LoginPage() {
                   )}
                 </div>
               )}
-
-              {/* ──────────────────────────────────────────────────────── */}
-              {/* TAB 2: EMAIL & PASSWORD (ENTERPRISE / CORPORATE)         */}
-              {/* ──────────────────────────────────────────────────────── */}
-              {authMethod === "email" && (
-                <div className="space-y-3.5">
-                  <form onSubmit={handleEmailLogin} className="space-y-3">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="email" className="text-xs">Corporate Email / Mobile</Label>
-                      <Input
-                        id="email"
-                        type="text"
-                        placeholder="name@kanak.in or 10-digit mobile"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                        autoComplete="username"
-                        disabled={isLoading}
-                        className="h-10 text-xs rounded-xl"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="password" className="text-xs">Password</Label>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setForgotEmail(email);
-                            setMode("forgot");
-                          }}
-                          className="text-[11px] text-primary hover:underline font-medium"
-                        >
-                          Forgot password?
-                        </button>
-                      </div>
-                      <Input
-                        id="password"
-                        type="password"
-                        placeholder="••••••••"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                        autoComplete="current-password"
-                        disabled={isLoading}
-                        className="h-10 text-xs rounded-xl"
-                      />
-                    </div>
-
-                    <Button type="submit" className="w-full h-10 text-xs font-bold rounded-xl shadow-md" disabled={isLoading}>
-                      {isLoading ? "Signing in..." : "Sign In with Password"}
-                    </Button>
-                  </form>
-
-                  {/* 1-Click Demo Login for Email Roles */}
-                  <div className="pt-2 border-t border-border/60 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                        <Sparkles className="w-3 h-3 text-primary" /> 1-Click Demo Accounts
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-1 gap-1 max-h-40 overflow-y-auto pr-0.5">
-                      {DEMO_EMAIL_USERS.map((u) => (
-                        <button
-                          key={u.email}
-                          type="button"
-                          disabled={isLoading}
-                          onClick={() => performEmailLogin(u.email, "password123")}
-                          className="flex items-center justify-between p-2 rounded-xl border border-border/50 hover:border-primary/50 hover:bg-accent/40 transition-all text-left text-xs disabled:opacity-50"
-                        >
-                          <div>
-                            <span className="font-semibold text-foreground block leading-tight">{u.name}</span>
-                            <span className="text-muted-foreground text-[10px]">{u.email}</span>
-                          </div>
-                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                            {u.role}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </CardContent>
 
         <CardFooter className="bg-muted/40 border-t border-border/50 px-5 py-3 flex items-center justify-between text-[11px] text-muted-foreground">
           <span className="flex items-center gap-1">
-            <Shield className="w-3 h-3 text-primary" /> 256-bit Encrypted
+            <Shield className="w-3 h-3 text-primary" /> 256-bit Encrypted Session
           </span>
-          <span className="font-mono text-[10px]">v2.4 PWA Edition</span>
+          <span className="font-mono text-[10px]">Enterprise Edition</span>
         </CardFooter>
       </Card>
 
@@ -973,36 +892,36 @@ export default function LoginPage() {
         <DialogContent className="max-w-sm p-5 text-center">
           <DialogHeader>
             <DialogTitle className="text-base font-bold flex items-center justify-center gap-2">
-              <Smartphone className="w-5 h-5 text-primary" /> Open PWA on Your Phone
+              <Smartphone className="w-5 h-5 text-primary" /> Open on Mobile Phone
             </DialogTitle>
             <DialogDescription className="text-xs">
-              Connect phone to same Wi-Fi network and scan QR code or navigate to:
+              Scan this QR code with your mobile camera or enter the server URL:
             </DialogDescription>
           </DialogHeader>
 
           <div className="flex flex-col items-center justify-center py-2 space-y-3">
             <div className="p-3 bg-white rounded-2xl shadow-md border border-slate-200">
               <img
-                src="/phone-pwa-qr.png"
-                alt="Phone PWA QR Code"
-                className="w-48 h-48 object-contain"
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(currentOrigin)}`}
+                alt="Mobile PWA QR Code"
+                className="w-44 h-44 object-contain"
               />
             </div>
 
             <div className="w-full p-2.5 rounded-xl bg-muted/60 border border-border/80 flex items-center justify-between gap-2">
-              <code className="text-xs font-mono font-bold text-foreground">
-                http://192.168.0.5:5173
+              <code className="text-xs font-mono font-bold text-foreground truncate max-w-[240px]">
+                {currentOrigin}
               </code>
               <Button
                 size="sm"
                 variant="ghost"
                 onClick={() => {
-                  navigator.clipboard.writeText("http://192.168.0.5:5173");
+                  navigator.clipboard.writeText(currentOrigin);
                   setCopiedUrl(true);
                   setTimeout(() => setCopiedUrl(false), 2000);
-                  toast({ title: "Copied!", description: "http://192.168.0.5:5173 copied to clipboard" });
+                  toast({ title: "Copied!", description: `${currentOrigin} copied to clipboard.` });
                 }}
-                className="h-7 px-2 text-xs"
+                className="h-7 px-2 text-xs shrink-0"
               >
                 {copiedUrl ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
               </Button>
@@ -1010,7 +929,7 @@ export default function LoginPage() {
 
             <div className="text-left text-xs text-muted-foreground space-y-1.5 w-full bg-primary/5 p-3 rounded-xl border border-primary/10">
               <p className="font-semibold text-foreground text-[11px]">How to install as app on phone:</p>
-              <p className="text-[11px]">1. Open camera & scan QR code (or type IP address above).</p>
+              <p className="text-[11px]">1. Open camera & scan QR code (or navigate to URL above).</p>
               <p className="text-[11px]">2. Tap <strong>"Install App"</strong> on the banner, or browser menu &rarr; <strong>"Add to Home Screen"</strong>.</p>
               <p className="text-[11px]">3. Launch from your home screen for full offline DPR & site execution!</p>
             </div>

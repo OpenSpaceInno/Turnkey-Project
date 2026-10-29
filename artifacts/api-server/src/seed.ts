@@ -52,6 +52,10 @@ import bcrypt from "bcryptjs";
 import { logger } from "./lib/logger";
 
 export async function seedIfEmpty(): Promise<void> {
+  if (process.env.NODE_ENV === "production" && process.env.SEED_DEMO_DATA !== "true") {
+    logger.info("Production mode: Mock business data seeding skipped. Database is ready for production entries.");
+    return;
+  }
   const [existingUser] = await db.select().from(usersTable).limit(1);
   if (existingUser) {
     logger.info("Seed data already present, skipping");
@@ -67,6 +71,7 @@ export async function seedIfEmpty(): Promise<void> {
       {
         email: "ananya.rao@kanak.in",
         name: "Ananya Rao",
+        phone: "9876543210",
         passwordHash: defaultPasswordHash,
         avatarUrl: null,
         roles: [
@@ -82,6 +87,7 @@ export async function seedIfEmpty(): Promise<void> {
       {
         email: "rohan.mehta@kanak.in",
         name: "Rohan Mehta",
+        phone: "9876543212",
         passwordHash: defaultPasswordHash,
         avatarUrl: null,
         roles: ["project_manager", "viewer"],
@@ -90,6 +96,7 @@ export async function seedIfEmpty(): Promise<void> {
       {
         email: "priya.iyer@kanak.in",
         name: "Priya Iyer",
+        phone: "9876543213",
         passwordHash: defaultPasswordHash,
         avatarUrl: null,
         roles: ["engineer", "viewer"],
@@ -98,6 +105,7 @@ export async function seedIfEmpty(): Promise<void> {
       {
         email: "vikram.shah@kanak.in",
         name: "Vikram Shah",
+        phone: "9876543214",
         passwordHash: defaultPasswordHash,
         avatarUrl: null,
         roles: ["accountant", "viewer"],
@@ -106,6 +114,7 @@ export async function seedIfEmpty(): Promise<void> {
       {
         email: "neha.kapoor@kanak.in",
         name: "Neha Kapoor",
+        phone: "9876543215",
         passwordHash: defaultPasswordHash,
         avatarUrl: null,
         roles: ["procurement_officer", "viewer"],
@@ -114,10 +123,43 @@ export async function seedIfEmpty(): Promise<void> {
       {
         email: "arjun.singh@kanak.in",
         name: "Arjun Singh",
+        phone: "9876543216",
         passwordHash: defaultPasswordHash,
         avatarUrl: null,
         roles: ["viewer"],
         activeRole: "viewer",
+      },
+      {
+        email: "Hari.mailapalli12@gmail.com",
+        name: "Harinarayana",
+        phone: "9876543211",
+        passwordHash: defaultPasswordHash,
+        avatarUrl: null,
+        roles: [
+          "admin",
+          "project_manager",
+          "engineer",
+          "accountant",
+          "procurement_officer",
+          "viewer",
+        ],
+        activeRole: "project_manager",
+      },
+      {
+        email: "venkibaipalli@gmail.com",
+        name: "Baipalli Venkateswara Rao",
+        phone: "9876543217",
+        passwordHash: defaultPasswordHash,
+        avatarUrl: null,
+        roles: [
+          "admin",
+          "project_manager",
+          "engineer",
+          "accountant",
+          "procurement_officer",
+          "viewer",
+        ],
+        activeRole: "admin",
       },
     ]);
 

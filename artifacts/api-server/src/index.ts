@@ -4,6 +4,7 @@ import { logger } from "./lib/logger";
 import { seedIfEmpty } from "./seed";
 import { startCronScheduler } from "./lib/cron-scheduler";
 import { initDatabaseSchema } from "./lib/init-db";
+import { ensureEssentialDemoUsers } from "./lib/ensure-demo-users";
 
 process.on("uncaughtException", (err) => {
   logger.error({ err }, "Uncaught Exception in process");
@@ -22,6 +23,7 @@ if (Number.isNaN(port) || port <= 0) {
 async function main() {
   try {
     await initDatabaseSchema();
+    await ensureEssentialDemoUsers();
     await seedIfEmpty();
     startCronScheduler();
   } catch (err) {

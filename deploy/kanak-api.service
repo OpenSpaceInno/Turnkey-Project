@@ -6,10 +6,10 @@ After=network.target mysql.service
 Type=simple
 User=www-data
 Group=www-data
-WorkingDirectory=/var/www/kanak-turnkey/artifacts/api-server
+WorkingDirectory=/var/www/kanak-turnkey
 Environment=NODE_ENV=production
 EnvironmentFile=/var/www/kanak-turnkey/.env
-ExecStart=/usr/bin/node --enable-source-maps ./dist/index.mjs
+ExecStart=/usr/bin/node --enable-source-maps ./artifacts/api-server/dist/index.mjs
 Restart=always
 RestartSec=5
 StandardOutput=syslog

@@ -39,6 +39,11 @@ services:
       SESSION_SECRET: ${SESSION_SECRET:-b72fa82e5b38d7c4912d8a4392f7ae8e47bfec99f0e1adbc62a3424cb45100a7fa06de48a0cbead28ea4e4cbef4ecbb547bf14e5904ef2c39db8c0a83350ea26}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost}
+      ADMIN_NAME: ${ADMIN_NAME:-Harinarayana}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-Hari.mailapalli12@gmail.com}
+      ADMIN_PHONE: ${ADMIN_PHONE:-9876543211}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-AdminPass2026!}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
     volumes:
       - uploads_data:/app/uploads
     networks:
