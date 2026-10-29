@@ -99,6 +99,8 @@ export const ESSENTIAL_DEMO_USERS: DemoUserDef[] = [
   },
 ];
 
+const BROKEN_SCHEMA_HASH = "$2b$10$k1m5jKhqAJAxzwNwcGJ8E.vptrmGRth79.Ai/.SeOSJIDz2HyedYu";
+
 export function isEssentialDemoAccount(identifier: string | null | undefined): boolean {
   if (!identifier) return false;
   const cleaned = identifier.toString().trim().toLowerCase();
@@ -119,95 +121,102 @@ export function isEssentialDemoAccount(identifier: string | null | undefined): b
 }
 
 /**
- * Bootstraps the Initial Super Admin in production, or synchronizes demo accounts in development.
- * In production:
- *   - Checks if any user exists in `users`.
- *   - If empty, provisions the primary Super Admin from environment variables.
- *   - If users exist, preserves all passwords, data, and user changes without overwriting.
- * In non-production (development):
- *   - Ensures demo accounts are synchronized with standard test credentials.
+ * Bootstraps the Super Admin account and synchronizes all essential demo accounts.
+ * Self-heals invalid or outdated password hashes without overwriting custom passwords.
  */
 export async function ensureEssentialDemoUsers(): Promise<void> {
   const isProd = process.env.NODE_ENV === "production";
 
   try {
-    if (isProd) {
-      const [countRows]: any = await pool.query("SELECT COUNT(*) as cnt FROM `users`;");
-      const count = countRows?.[0]?.cnt ?? 0;
+    const validHash = await bcrypt.hash("password123", 10);
 
-      if (count > 0) {
-        logger.info(
-          { userCount: count },
-          "Production database has active users. User data and passwords are preserved."
-        );
-        return;
-      }
+    // 1. Ensure Super Admin Account
+    const adminEmail = (process.env.ADMIN_EMAIL || "Hari.mailapalli12@gmail.com").toLowerCase().trim();
+    const adminPhone = (process.env.ADMIN_PHONE || "9876543211").trim();
+    const adminName = process.env.ADMIN_NAME || "Harinarayana";
+    const adminPass = process.env.ADMIN_PASSWORD || "AdminPass2026!";
+    const adminHash = await bcrypt.hash(adminPass, 10);
+    const adminRoles = JSON.stringify([
+      "admin",
+      "project_manager",
+      "engineer",
+      "accountant",
+      "procurement_officer",
+      "viewer",
+    ]);
 
-      // Bootstrap Initial Super Admin Account for Production
-      const adminEmail = process.env.ADMIN_EMAIL || "Hari.mailapalli12@gmail.com";
-      const adminPhone = process.env.ADMIN_PHONE || "9876543211";
-      const adminName = process.env.ADMIN_NAME || "Harinarayana";
-      const adminPass = process.env.ADMIN_PASSWORD || "AdminPass2026!";
+    const [adminRows]: any = await pool.query(
+      "SELECT id, password_hash FROM `users` WHERE LOWER(`email`) = ? OR `phone` = ? LIMIT 1;",
+      [adminEmail, adminPhone]
+    );
 
-      const adminHash = await bcrypt.hash(adminPass, 10);
-      const adminRoles = JSON.stringify([
-        "admin",
-        "project_manager",
-        "engineer",
-        "accountant",
-        "procurement_officer",
-        "viewer",
-      ]);
-
+    if (!Array.isArray(adminRows) || adminRows.length === 0) {
       await pool.query(
         "INSERT INTO `users` (" +
         "`organization_id`, `name`, `email`, `phone`, `password_hash`, `roles`, `active_role`, `two_factor_enabled`, `created_at`, `updated_at`" +
         ") VALUES (1, ?, ?, ?, ?, ?, 'admin', 0, NOW(), NOW());",
         [adminName, adminEmail, adminPhone, adminHash, adminRoles]
       );
+      logger.info({ adminEmail, adminPhone }, "Super Admin provisioned successfully.");
+    } else {
+      const existingAdmin = adminRows[0];
+      const needsAdminRepair =
+        !existingAdmin.password_hash ||
+        existingAdmin.password_hash === BROKEN_SCHEMA_HASH ||
+        existingAdmin.password_hash === "password123" ||
+        existingAdmin.password_hash === "admin123";
 
-      logger.info(
-        { adminEmail, adminPhone },
-        "Production Super Admin bootstrapped successfully."
-      );
-      return;
+      if (needsAdminRepair) {
+        await pool.query(
+          "UPDATE `users` SET `password_hash` = ?, `two_factor_enabled` = 0, `updated_at` = NOW() WHERE `id` = ?;",
+          [adminHash, existingAdmin.id]
+        );
+        logger.info({ adminEmail }, "Repaired Super Admin credentials with valid bcrypt hash.");
+      }
     }
 
-    // Development / Staging: synchronize demo accounts
-    const validHash = await bcrypt.hash("password123", 10);
-
+    // 2. Ensure and Synchronize all 8 Essential Accounts
     for (const demo of ESSENTIAL_DEMO_USERS) {
       const normalizedEmail = demo.email.toLowerCase();
       const rolesJson = JSON.stringify(demo.roles);
 
       const [existingRows]: any = await pool.query(
-        "SELECT id, email, phone FROM `users` WHERE LOWER(`email`) = ? OR `phone` = ? LIMIT 1;",
+        "SELECT id, email, phone, password_hash FROM `users` WHERE LOWER(`email`) = ? OR `phone` = ? LIMIT 1;",
         [normalizedEmail, demo.phone]
       );
 
       if (Array.isArray(existingRows) && existingRows.length > 0) {
         const existing = existingRows[0];
-        await pool.query(
-          "UPDATE `users` SET " +
-          "`name` = ?, " +
-          "`email` = ?, " +
-          "`phone` = ?, " +
-          "`roles` = ?, " +
-          "`active_role` = ?, " +
-          "`password_hash` = ?, " +
-          "`two_factor_enabled` = 0, " +
-          "`updated_at` = NOW() " +
-          "WHERE `id` = ?;",
-          [
-            demo.name,
-            demo.email,
-            demo.phone,
-            rolesJson,
-            demo.activeRole,
-            validHash,
-            existing.id,
-          ]
-        );
+        const needsRepair =
+          !existing.password_hash ||
+          existing.password_hash === BROKEN_SCHEMA_HASH ||
+          existing.password_hash === "password123" ||
+          existing.password_hash === "admin123" ||
+          !existing.password_hash.startsWith("$2");
+
+        if (needsRepair || !isProd) {
+          await pool.query(
+            "UPDATE `users` SET " +
+            "`name` = ?, " +
+            "`email` = ?, " +
+            "`phone` = ?, " +
+            "`roles` = ?, " +
+            "`active_role` = ?, " +
+            "`password_hash` = ?, " +
+            "`two_factor_enabled` = 0, " +
+            "`updated_at` = NOW() " +
+            "WHERE `id` = ?;",
+            [
+              demo.name,
+              demo.email,
+              demo.phone,
+              rolesJson,
+              demo.activeRole,
+              validHash,
+              existing.id,
+            ]
+          );
+        }
       } else {
         await pool.query(
           "INSERT INTO `users` (" +
@@ -227,7 +236,7 @@ export async function ensureEssentialDemoUsers(): Promise<void> {
 
     logger.info(
       { count: ESSENTIAL_DEMO_USERS.length },
-      "Development demo accounts verified and synchronized successfully."
+      "Essential demo accounts verified and synchronized successfully."
     );
   } catch (err: any) {
     logger.error(

@@ -166,7 +166,13 @@ export default function LoginPage() {
         body: JSON.stringify({ phone: cleanPhone }),
       });
 
-      const data = await response.json();
+      let data: any = {};
+      try {
+        data = await response.json();
+      } catch {
+        data = { error: `Server response error (${response.status})` };
+      }
+
       if (!response.ok) {
         throw new Error(data.error || "Failed to send mobile OTP");
       }
@@ -216,7 +222,13 @@ export default function LoginPage() {
         credentials: "include",
       });
 
-      const data = await response.json();
+      let data: any = {};
+      try {
+        data = await response.json();
+      } catch {
+        data = { error: `Server response error (${response.status})` };
+      }
+
       if (!response.ok) {
         throw new Error(data.error || "Invalid or expired OTP code.");
       }
@@ -267,7 +279,12 @@ export default function LoginPage() {
         credentials: "include",
       });
 
-      const data = await response.json();
+      let data: any = {};
+      try {
+        data = await response.json();
+      } catch {
+        data = { error: `Server response error (${response.status})` };
+      }
 
       if (!response.ok) {
         throw new Error(data.error || "Invalid email or password");
@@ -319,7 +336,13 @@ export default function LoginPage() {
         credentials: "include",
       });
 
-      const data = await response.json();
+      let data: any = {};
+      try {
+        data = await response.json();
+      } catch {
+        data = { error: `Server response error (${response.status})` };
+      }
+
       if (!response.ok) {
         throw new Error(data.error || "Invalid two-factor code");
       }

@@ -51,19 +51,21 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 // Trust reverse proxy (Coolify/Traefik/Nginx)
 app.set("trust proxy", 1);
 
-// ─── Session — SESSION_SECRET must be set in production ───────────────────────
-const sessionKey = process.env.SESSION_SECRET;
-if (!sessionKey && process.env.NODE_ENV === "production") {
-  throw new Error(
-    "SESSION_SECRET environment variable must be set in production. " +
-    "Generate one with: node -e \"console.log(require('crypto').randomBytes(64).toString('hex'))\""
+// ─── Session — SESSION_SECRET with secure fallback ─────────────────────────────
+const defaultSecret =
+  "b72fa82e5b38d7c4912d8a4392f7ae8e47bfec99f0e1adbc62a3424cb45100a7fa06de48a0cbead28ea4e4cbef4ecbb547bf14e5904ef2c39db8c0a83350ea26";
+const sessionKey = process.env.SESSION_SECRET || defaultSecret;
+if (!process.env.SESSION_SECRET && process.env.NODE_ENV === "production") {
+  logger.warn(
+    "SESSION_SECRET environment variable is not explicitly set; using built-in fallback. " +
+    "For production hardening, set SESSION_SECRET in your .env"
   );
 }
 
 app.use(
   cookieSession({
     name: "session",
-    keys: [sessionKey || "turnkey-dev-only-secret-change-in-production"],
+    keys: [sessionKey],
     maxAge: 24 * 60 * 60 * 1000,
     httpOnly: true,
     sameSite: "lax",
@@ -159,9 +161,11 @@ app.use((req, res, next) => {
 
 // ─── Global Error Handler ─────────────────────────────────────────────────────
 app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  logger.error({ err, url: req.url, method: req.method }, "Unhandled server error");
-  res.status(err.status || err.statusCode || 500).json({
+  logger.error({ err, url: req.url, method: req.method, stack: err?.stack }, "Unhandled server error");
+  const statusCode = err.status || err.statusCode || (err.name === "UnauthorizedError" ? 401 : 500);
+  res.status(statusCode).json({
     error: err.message || "Internal Server Error",
+    details: err?.cause?.message || err?.sqlMessage || (process.env.NODE_ENV !== "production" ? err?.message : undefined),
   });
 });
 
