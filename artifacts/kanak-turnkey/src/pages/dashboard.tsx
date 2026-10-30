@@ -23,6 +23,7 @@ import {
   Zap,
   ShieldCheck,
   AlertTriangle,
+  AlertCircle,
   Clock,
   CheckCircle2,
   TrendingUp,
