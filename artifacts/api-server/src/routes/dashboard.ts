@@ -465,27 +465,8 @@ router.get("/dashboard/summary", async (req, res): Promise<void> => {
 
   const punchMap = new Map(punchListCounts.map((r) => [r.projectId, Number(r.openCount)]));
 
-  // Check 4: Site Execution & Measurements (For Site Engineers)
+  // Check 4: Quality & Safety Snags (For Site Engineers)
   if (me.activeRole === "engineer" || me.activeRole === "site_engineer") {
-    nextActions.push({
-      id: "site-execution-log",
-      priority: "high",
-      category: "Site Execution",
-      title: "Log Daily Site Progress (DPR)",
-      description: "Submit today's labor, equipment usage, and physical work completed on site.",
-      actionText: "Log DPR",
-      actionUrl: "/site-execution?tab=daily-reports",
-    });
-    nextActions.push({
-      id: "site-measurements-jmr",
-      priority: "medium",
-      category: "Measurements",
-      title: "Record Joint Measurements (JMR)",
-      description: "Record verified field measurements for contractor bills and milestones.",
-      actionText: "Record JMR",
-      actionUrl: "/ra-bills?tab=work-completions",
-    });
-
     const totalOpenSnags = Array.from(punchMap.values()).reduce((a, b) => a + b, 0);
     if (totalOpenSnags > 0) {
       nextActions.push({
