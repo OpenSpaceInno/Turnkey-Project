@@ -227,14 +227,6 @@ export default function Dashboard() {
               >
                 <ShoppingCart className="h-4 w-4" /> Raise Indent
               </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setLocation("/quality-safety?tab=snag-list")}
-                className="gap-1.5 font-medium"
-              >
-                <AlertTriangle className="h-4 w-4" /> Log Snag
-              </Button>
             </>
           )}
 
@@ -332,15 +324,15 @@ export default function Dashboard() {
 
           <Card 
             className="border shadow-xs hover:border-primary/50 transition-all cursor-pointer bg-card hover:bg-muted/30"
-            onClick={() => setLocation("/quality-safety?tab=snag-list")}
+            onClick={() => setLocation("/ra-bills?tab=work-completions")}
           >
             <CardContent className="p-3.5 flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-rose-500/10 text-rose-600 flex items-center justify-center shrink-0">
-                <AlertTriangle className="h-5 w-5" />
+              <div className="h-10 w-10 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
+                <Layers className="h-5 w-5" />
               </div>
               <div className="min-w-0">
-                <span className="text-[10px] uppercase font-bold text-muted-foreground block">Quality Control</span>
-                <span className="text-sm font-bold text-foreground truncate block">Punch List & Snags</span>
+                <span className="text-[10px] uppercase font-bold text-muted-foreground block">Measurements</span>
+                <span className="text-sm font-bold text-foreground truncate block">Field JMR</span>
               </div>
             </CardContent>
           </Card>
@@ -548,19 +540,23 @@ export default function Dashboard() {
                     </div>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
                       <span>Progress: <strong className="text-foreground">{ph.progress}%</strong></span>
-                      <span>•</span>
-                      <span>
-                        Quality:{" "}
-                        <strong
-                          className={
-                            ph.qualityStatus === "clear"
-                              ? "text-emerald-600 font-semibold"
-                              : "text-amber-600 font-semibold"
-                          }
-                        >
-                          {ph.openSnagsCount === 0 ? "Zero Snags" : `${ph.openSnagsCount} Snags Open`}
-                        </strong>
-                      </span>
+                      {!isSiteEngineer && (
+                        <>
+                          <span>•</span>
+                          <span>
+                            Quality:{" "}
+                            <strong
+                              className={
+                                ph.qualityStatus === "clear"
+                                  ? "text-emerald-600 font-semibold"
+                                  : "text-amber-600 font-semibold"
+                              }
+                            >
+                              {ph.openSnagsCount === 0 ? "Zero Snags" : `${ph.openSnagsCount} Snags Open`}
+                            </strong>
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -805,7 +801,7 @@ export default function Dashboard() {
                 Site Field Operations Center
               </CardTitle>
               <CardDescription className="text-xs">
-                Field measurements, daily logs, and site quality control.
+                Field measurements, daily logs, and site progress tracking.
               </CardDescription>
             </CardHeader>
             <CardContent className="p-4 space-y-3">
@@ -874,14 +870,14 @@ export default function Dashboard() {
                 </div>
 
                 <div
-                  onClick={() => setLocation("/quality-safety?tab=snag-list")}
+                  onClick={() => setLocation("/site-execution?tab=delays")}
                   className="flex items-center justify-between p-2.5 rounded-lg border bg-muted/20 hover:bg-muted/40 transition-colors cursor-pointer text-xs"
                 >
                   <div className="flex items-center gap-2.5">
-                    <AlertTriangle className="h-4 w-4 text-rose-500" />
+                    <AlertCircle className="h-4 w-4 text-amber-500" />
                     <div>
-                      <div className="font-semibold text-foreground">Snag List & De-Snagging</div>
-                      <div className="text-[10px] text-muted-foreground">Log defects & upload resolution photos</div>
+                      <div className="font-semibold text-foreground">Site Issues & Delays</div>
+                      <div className="text-[10px] text-muted-foreground">Log site hindrances & schedule bottlenecks</div>
                     </div>
                   </div>
                   <ChevronRight className="h-4 w-4 text-muted-foreground" />

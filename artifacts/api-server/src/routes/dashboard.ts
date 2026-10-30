@@ -465,22 +465,6 @@ router.get("/dashboard/summary", async (req, res): Promise<void> => {
 
   const punchMap = new Map(punchListCounts.map((r) => [r.projectId, Number(r.openCount)]));
 
-  // Check 4: Quality & Safety Snags (For Site Engineers)
-  if (me.activeRole === "engineer" || me.activeRole === "site_engineer") {
-    const totalOpenSnags = Array.from(punchMap.values()).reduce((a, b) => a + b, 0);
-    if (totalOpenSnags > 0) {
-      nextActions.push({
-        id: "site-snags-clearance",
-        priority: "high",
-        category: "Quality & Safety",
-        title: `${totalOpenSnags} Open Snag(s) Pending Resolution`,
-        description: "Inspect reported defects and de-snag items on site with photographic proof.",
-        actionText: "Inspect Snags",
-        actionUrl: "/quality-safety?tab=snag-list",
-      });
-    }
-  }
-
   const projectHealth = myProjectsRaw.slice(0, 5).map((p) => {
     const openSnags = punchMap.get(p.id) || 0;
     const isDelayed = p.endDate ? new Date(p.endDate) < new Date() && p.progress < 100 : false;

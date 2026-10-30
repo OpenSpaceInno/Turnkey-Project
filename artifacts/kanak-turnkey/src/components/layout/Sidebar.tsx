@@ -64,7 +64,7 @@ export function Sidebar() {
     location.startsWith("/site-execution") || currentFullPath.includes("tab=work-completions") || isSiteEngineer
   );
   const [qualitySafetyExpanded, setQualitySafetyExpanded] = useState(
-    location.startsWith("/quality-safety")
+    !isSiteEngineer && location.startsWith("/quality-safety")
   );
   const [billingExpanded, setBillingExpanded] = useState(
     !isSiteEngineer && (location.startsWith("/ra-bills") || location.startsWith("/finance"))
@@ -80,7 +80,7 @@ export function Sidebar() {
   useEffect(() => {
     if (location.startsWith("/procurement")) setProcurementExpanded(true);
     if (location.startsWith("/site-execution") || currentFullPath.includes("tab=work-completions")) setSiteExecutionExpanded(true);
-    if (location.startsWith("/quality-safety")) setQualitySafetyExpanded(true);
+    if (!isSiteEngineer && location.startsWith("/quality-safety")) setQualitySafetyExpanded(true);
     if (!isSiteEngineer && (location.startsWith("/ra-bills") || location.startsWith("/finance"))) setBillingExpanded(true);
     if (!isSiteEngineer && location.startsWith("/reports")) setReportsExpanded(true);
     if (!isSiteEngineer && (location.startsWith("/admin") || location.startsWith("/settings") || location.startsWith("/audit-logs"))) setAdminExpanded(true);
@@ -208,8 +208,8 @@ export function Sidebar() {
 
   const hasProcurementAccess = visibleProcurementSubmenu.length > 0;
   const hasSiteExecutionAccess = visibleSiteExecutionSubmenu.length > 0;
-  const hasQualitySafetyAccess = visibleQualitySafetySubmenu.length > 0;
-  // Strictly hide Billing, Reports and Admin for Site Engineers
+  // Strictly hide Quality & Safety, Billing, Reports, and Admin for Site Engineers
+  const hasQualitySafetyAccess = !isSiteEngineer && visibleQualitySafetySubmenu.length > 0;
   const hasBillingAccess = !isSiteEngineer && visibleBillingSubmenu.length > 0;
   const hasReportsAccess = !isSiteEngineer && visibleReportsSubmenu.length > 0;
   const hasAdminAccess = !isSiteEngineer && visibleAdminSubmenu.length > 0;
