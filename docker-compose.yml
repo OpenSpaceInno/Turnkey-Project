@@ -9,6 +9,8 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE:-turnkey_db}
       MYSQL_USER: ${MYSQL_USER:-turnkey_user}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-TurnkeyPass2026!}
+    ports:
+      - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       # Automatically initialize all tables on initial database creation
