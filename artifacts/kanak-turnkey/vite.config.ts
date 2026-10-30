@@ -56,11 +56,11 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: process.env.API_TARGET || 'http://7wcoiengxfehdnlfk3jcxgax.213.210.37.249.sslip.io',
         changeOrigin: true,
       },
       '/uploads': {
-        target: 'http://localhost:3000',
+        target: process.env.API_TARGET || 'http://7wcoiengxfehdnlfk3jcxgax.213.210.37.249.sslip.io',
         changeOrigin: true,
       },
     },
