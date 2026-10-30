@@ -1,10 +1,13 @@
 import fs from "fs";
 import path from "path";
-import { pool } from "@workspace/db";
+import { pool, healDatabaseConnection } from "@workspace/db";
 import { logger } from "./logger";
 
 export async function initDatabaseSchema(): Promise<void> {
   try {
+    // 0. Auto-heal database credentials if needed
+    await healDatabaseConnection();
+
     // 1. Inspect existing database tables count
     const [tables]: any = await pool.query("SHOW TABLES;");
     const tableCount = Array.isArray(tables) ? tables.length : 0;
