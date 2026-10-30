@@ -171,6 +171,7 @@ export function ProjectBudgetTab({
       setAddDialogOpen(false);
       await queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "budget-variance"] });
       await queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/budget`] });
+      await queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}`] });
       await queryClient.invalidateQueries({ queryKey: ["/api/reports/budget-variance"] });
     } catch (err: any) {
       toast({ title: "Failed to add budget line", description: err.message, variant: "destructive" });
@@ -201,6 +202,7 @@ export function ProjectBudgetTab({
       setEditItem(null);
       await queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "budget-variance"] });
       await queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/budget`] });
+      await queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}`] });
       await queryClient.invalidateQueries({ queryKey: ["/api/reports/budget-variance"] });
     } catch (err: any) {
       toast({ title: "Update failed", description: err.message, variant: "destructive" });
@@ -218,6 +220,7 @@ export function ProjectBudgetTab({
       toast({ title: "Item Removed", description: `Budget item ${code} removed.` });
       await queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "budget-variance"] });
       await queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/budget`] });
+      await queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}`] });
       await queryClient.invalidateQueries({ queryKey: ["/api/reports/budget-variance"] });
     } catch (err: any) {
       toast({ title: "Delete failed", description: err.message, variant: "destructive" });

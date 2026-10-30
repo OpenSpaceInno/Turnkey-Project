@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetProjectTeam,
   useAssignProjectTeamMember,
@@ -41,6 +42,7 @@ const PROJECT_ROLES = [
 ] as const;
 
 export function ProjectTeamManager({ projectId }: { projectId: number }) {
+  const qc = useQueryClient();
   const { toast } = useToast();
   const [openAdd, setOpenAdd] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string>("");
@@ -70,6 +72,9 @@ export function ProjectTeamManager({ projectId }: { projectId: number }) {
       });
       setOpenAdd(false);
       setSelectedUserId("");
+      await qc.invalidateQueries({ queryKey: [`/api/projects/${projectId}/team`] });
+      await qc.invalidateQueries({ queryKey: [`/api/projects/${projectId}/setup-checklist`] });
+      await qc.invalidateQueries({ queryKey: [`/api/projects/${projectId}`] });
     } catch (err: any) {
       toast({
         title: "Assignment Failed",
@@ -87,6 +92,9 @@ export function ProjectTeamManager({ projectId }: { projectId: number }) {
         title: "Team Member Removed",
         description: `${name || "User"} is no longer assigned to this project.`,
       });
+      await qc.invalidateQueries({ queryKey: [`/api/projects/${projectId}/team`] });
+      await qc.invalidateQueries({ queryKey: [`/api/projects/${projectId}/setup-checklist`] });
+      await qc.invalidateQueries({ queryKey: [`/api/projects/${projectId}`] });
     } catch (err: any) {
       toast({
         title: "Action Failed",

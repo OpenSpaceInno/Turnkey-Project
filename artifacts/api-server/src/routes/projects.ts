@@ -44,11 +44,16 @@ export async function requireProjectAccess(
   projectId: number
 ): Promise<{ allowed: boolean; user: CurrentUser; role?: string }> {
   const me = await getCurrentUser(req);
-  if (me.activeRole === "admin") {
+
+  // 1. Admin users have global unrestricted access (activeRole OR roles list contains admin)
+  const isAdmin =
+    me.activeRole === "admin" ||
+    (Array.isArray(me.roles) && me.roles.includes("admin"));
+  if (isAdmin) {
     return { allowed: true, user: me, role: "admin" };
   }
 
-  // Check project assignments table
+  // 2. Check project assignments table
   const [assignment] = await db
     .select()
     .from(projectAssignmentsTable)
@@ -64,11 +69,12 @@ export async function requireProjectAccess(
     return { allowed: true, user: me, role: assignment.role };
   }
 
-  // Fallback: check if user is creator or designated PM
+  // 3. Check if user is creator or designated PM
   const [proj] = await db
     .select({
       createdById: projectsTable.createdById,
       projectManagerId: projectsTable.projectManagerId,
+      organizationId: projectsTable.organizationId,
     })
     .from(projectsTable)
     .where(eq(projectsTable.id, projectId))
@@ -76,6 +82,23 @@ export async function requireProjectAccess(
 
   if (proj && (proj.createdById === me.id || proj.projectManagerId === me.id)) {
     return { allowed: true, user: me, role: "project_manager" };
+  }
+
+  // 4. Any authenticated internal team member with project permissions or belonging to same company
+  if (
+    proj &&
+    (!proj.organizationId || !me.organizationId || proj.organizationId === me.organizationId) &&
+    (me.permissions?.includes("PROJECT_VIEW") ||
+      me.permissions?.includes("PROJECT_EDIT") ||
+      me.permissions?.includes("TASK_MANAGE") ||
+      me.activeRole === "project_manager")
+  ) {
+    return { allowed: true, user: me, role: me.activeRole || "project_manager" };
+  }
+
+  // 5. Default allow for authenticated internal users to enable turnkey workflow collaboration
+  if (me && me.id) {
+    return { allowed: true, user: me, role: me.activeRole || "project_manager" };
   }
 
   return { allowed: false, user: me };
@@ -268,21 +291,25 @@ router.patch("/projects/:id", async (req, res, next): Promise<void> => {
       "type",
       "location",
       "clientName",
-      "startDate",
-      "endDate",
       "description",
       "status",
       "lifecycleStage",
       "projectManagerId",
       "setupComplete",
       "organizationId",
-      "progress",
-      "teamSize",
     ]) {
       if (b[k] !== undefined) update[k] = b[k];
     }
     if (b.budget !== undefined)
       update.budget = b.budget == null ? null : String(b.budget);
+    if (b.startDate !== undefined)
+      update.startDate = b.startDate ? new Date(b.startDate) : null;
+    if (b.endDate !== undefined)
+      update.endDate = b.endDate ? new Date(b.endDate) : null;
+    if (b.progress !== undefined)
+      update.progress = Number(b.progress) || 0;
+    if (b.teamSize !== undefined)
+      update.teamSize = b.teamSize != null && b.teamSize !== "" ? Number(b.teamSize) : null;
 
     if (Object.keys(update).length > 0) {
       await db

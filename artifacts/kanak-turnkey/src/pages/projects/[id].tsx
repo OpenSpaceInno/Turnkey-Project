@@ -14,6 +14,7 @@ import {
   useCreatePunchListItem,
   useUpdatePunchListItem,
   useUpdateProject,
+  getListProjectsQueryKey,
   useListTaskTemplates,
   useGetTaskTemplate, getGetTaskTemplateQueryKey,
   useApplyTaskTemplate,
@@ -168,14 +169,97 @@ export default function ProjectDetail() {
   const { data: punchItems }   = useListPunchListItems({ projectId }, { query: { enabled, queryKey: getListPunchListItemsQueryKey({ projectId }) } });
 
   const updateProject  = useUpdateProject();
+
+  // ── Edit Project Dialog State ──────────────────────────────────────────────
+  const [editProjectOpen, setEditProjectOpen] = useState(false);
+  const [editProjForm, setEditProjForm] = useState({
+    name: "",
+    clientName: "",
+    budget: "",
+    location: "",
+    type: "",
+    status: "planning",
+    progress: 0,
+    lifecycleStage: "setup",
+    startDate: "",
+    endDate: "",
+    teamSize: "",
+    description: "",
+  });
+
+  const openEditProject = () => {
+    if (!project) return;
+    setEditProjForm({
+      name: project.name || "",
+      clientName: project.clientName || "",
+      budget: project.budget != null ? String(project.budget) : "",
+      location: project.location || "",
+      type: project.type || "",
+      status: project.status || "planning",
+      progress: project.progress ?? 0,
+      lifecycleStage: (project as any).lifecycleStage || "setup",
+      startDate: project.startDate ? format(new Date(project.startDate), "yyyy-MM-dd") : "",
+      endDate: project.endDate ? format(new Date(project.endDate), "yyyy-MM-dd") : "",
+      teamSize: project.teamSize != null ? String(project.teamSize) : "",
+      description: project.description || "",
+    });
+    setEditProjectOpen(true);
+  };
+
+  const handleSaveProject = async () => {
+    if (!editProjForm.name.trim()) {
+      toast({ title: "Validation Error", description: "Project name is required.", variant: "destructive" });
+      return;
+    }
+    try {
+      await updateProject.mutateAsync({
+        id: projectId,
+        data: {
+          name: editProjForm.name.trim(),
+          clientName: editProjForm.clientName.trim() || undefined,
+          budget: editProjForm.budget ? Number(editProjForm.budget) : undefined,
+          location: editProjForm.location.trim() || undefined,
+          type: editProjForm.type.trim() || undefined,
+          status: editProjForm.status as any,
+          progress: Number(editProjForm.progress) || 0,
+          lifecycleStage: editProjForm.lifecycleStage as any,
+          startDate: editProjForm.startDate || undefined,
+          endDate: editProjForm.endDate || undefined,
+          teamSize: editProjForm.teamSize ? Number(editProjForm.teamSize) : undefined,
+          description: editProjForm.description.trim() || undefined,
+        },
+      });
+      await qc.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) });
+      await qc.invalidateQueries({ queryKey: (getListProjectsQueryKey as any)() });
+      await qc.invalidateQueries({ queryKey: [`/api/projects/${projectId}/setup-checklist`] });
+      setEditProjectOpen(false);
+      toast({
+        title: "Project Updated",
+        description: "Project details saved to database successfully.",
+      });
+    } catch (err: any) {
+      toast({
+        title: "Failed to update project",
+        description: err.message || "Could not save project details.",
+        variant: "destructive",
+      });
+    }
+  };
   const createPunch    = useCreatePunchListItem();
   const updatePunch    = useUpdatePunchListItem();
 
   const [activeTab, setActiveTab] = useState(() => {
     const tabParam = new URLSearchParams(window.location.search).get("tab");
-    if (tabParam === "team") return "journey";
+    if (tabParam === "team" || tabParam === "overview") return "journey";
     return tabParam || "journey";
   });
+
+  useEffect(() => {
+    const tabParam = new URLSearchParams(window.location.search).get("tab");
+    if (tabParam === "overview" && project) {
+      openEditProject();
+    }
+  }, [project]);
 
   useEffect(() => {
     const tabParam = new URLSearchParams(window.location.search).get("tab");
@@ -337,8 +421,9 @@ export default function ProjectDetail() {
           endDate: taskForm.endDate || null,
         },
       });
-      await qc.invalidateQueries({ queryKey: getListTasksQueryKey({ projectId }) });
+      await qc.invalidateQueries({ queryKey: (getListTasksQueryKey as any)({ projectId }) });
       await qc.invalidateQueries({ queryKey: ["/api/tasks"] });
+      await qc.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) });
       await refetchTasks();
       setAddTaskOpen(false);
       setTaskForm({ title: "", description: "", priority: "medium", startDate: "", endDate: "" });
@@ -362,6 +447,9 @@ export default function ProjectDetail() {
         },
       });
       await qc.invalidateQueries({ queryKey: getListBudgetItemsQueryKey(projectId) });
+      await qc.invalidateQueries({ queryKey: [`/api/projects/${projectId}/budget`] });
+      await qc.invalidateQueries({ queryKey: ["/api/projects", projectId, "budget-variance"] });
+      await qc.invalidateQueries({ queryKey: getGetProjectQueryKey(projectId) });
       await qc.invalidateQueries({ queryKey: ["/api/budget-items"] });
       setAddBudgetOpen(false);
       setBudgetForm({ costCode: "", description: "", budgeted: "", actual: "0", committed: "0" });
@@ -623,14 +711,26 @@ export default function ProjectDetail() {
           </div>
         </div>
 
-        <Button
-          variant={activeTab === "journey" ? "default" : "outline"}
-          className="gap-2 shrink-0 border-primary/40 bg-primary/5 hover:bg-primary/10 text-primary font-semibold data-[state=active]:bg-primary shadow-xs"
-          onClick={() => setActiveTab("journey")}
-        >
-          <Sparkles className="h-4 w-4" />
-          End-to-End Lifecycle Map
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={openEditProject}
+            className="gap-1.5 shadow-sm border-primary/40 text-primary hover:bg-primary/10 font-semibold"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Edit Project Details
+          </Button>
+
+          <Button
+            variant={activeTab === "journey" ? "default" : "outline"}
+            className="gap-2 shrink-0 border-primary/40 bg-primary/5 hover:bg-primary/10 text-primary font-semibold data-[state=active]:bg-primary shadow-xs"
+            onClick={() => setActiveTab("journey")}
+          >
+            <Sparkles className="h-4 w-4" />
+            End-to-End Lifecycle Map
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -671,6 +771,16 @@ export default function ProjectDetail() {
                   </div>
                 )}
               </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={openEditProject}
+                className="w-full gap-1.5 mt-2 border-dashed border-primary/30 text-primary hover:bg-primary/10 font-medium text-xs"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                Edit Project Details
+              </Button>
             </CardContent>
           </Card>
 
@@ -1754,6 +1864,177 @@ export default function ProjectDetail() {
           </Tabs>
         </div>
       </div>
+
+      {/* ── Edit Project Details Dialog ── */}
+      <Dialog open={editProjectOpen} onOpenChange={setEditProjectOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <Pencil className="h-5 w-5 text-primary" />
+              Edit Project Details
+            </DialogTitle>
+            <DialogDescription>
+              Update project name, client entity, budget baseline, status, and dates. Changes save directly to the database.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-2">
+            <div className="sm:col-span-2 space-y-1.5">
+              <Label className="text-xs font-semibold">Project Name *</Label>
+              <Input
+                value={editProjForm.name}
+                onChange={(e) => setEditProjForm({ ...editProjForm, name: e.target.value })}
+                placeholder="Project title..."
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Client / Customer Name</Label>
+              <Input
+                value={editProjForm.clientName}
+                onChange={(e) => setEditProjForm({ ...editProjForm, clientName: e.target.value })}
+                placeholder="Client organization..."
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Contract Budget (₹)</Label>
+              <Input
+                type="number"
+                value={editProjForm.budget}
+                onChange={(e) => setEditProjForm({ ...editProjForm, budget: e.target.value })}
+                placeholder="e.g. 32500000"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Location</Label>
+              <Input
+                value={editProjForm.location}
+                onChange={(e) => setEditProjForm({ ...editProjForm, location: e.target.value })}
+                placeholder="e.g. Bandra West, Mumbai"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Project Type</Label>
+              <Input
+                value={editProjForm.type}
+                onChange={(e) => setEditProjForm({ ...editProjForm, type: e.target.value })}
+                placeholder="e.g. Hotel Interior Fit-out, EPC Turnkey"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Status</Label>
+              <Select
+                value={editProjForm.status}
+                onValueChange={(val) => setEditProjForm({ ...editProjForm, status: val })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="planning">Planning & Mobilization</SelectItem>
+                  <SelectItem value="procurement">Procurement</SelectItem>
+                  <SelectItem value="execution">Execution</SelectItem>
+                  <SelectItem value="qc">Quality Inspection (QC)</SelectItem>
+                  <SelectItem value="handover">Billing & Handover</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="on_hold">On Hold</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Progress ({editProjForm.progress}%)</Label>
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                value={editProjForm.progress}
+                onChange={(e) => setEditProjForm({ ...editProjForm, progress: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Start Date</Label>
+              <Input
+                type="date"
+                value={editProjForm.startDate}
+                onChange={(e) => setEditProjForm({ ...editProjForm, startDate: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Target Handover Date</Label>
+              <Input
+                type="date"
+                value={editProjForm.endDate}
+                onChange={(e) => setEditProjForm({ ...editProjForm, endDate: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Team Size</Label>
+              <Input
+                type="number"
+                value={editProjForm.teamSize}
+                onChange={(e) => setEditProjForm({ ...editProjForm, teamSize: e.target.value })}
+                placeholder="e.g. 15"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Lifecycle Stage</Label>
+              <Select
+                value={editProjForm.lifecycleStage}
+                onValueChange={(val) => setEditProjForm({ ...editProjForm, lifecycleStage: val })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="setup">Stage 1: Setup & Mobilization</SelectItem>
+                  <SelectItem value="planning">Stage 2: Detailed Planning</SelectItem>
+                  <SelectItem value="procurement">Stage 3: Procurement & Sourcing</SelectItem>
+                  <SelectItem value="execution">Stage 4: Site Execution & JMR</SelectItem>
+                  <SelectItem value="billing">Stage 5: Billing & Invoicing</SelectItem>
+                  <SelectItem value="handover">Stage 6: Handover & DLP</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="sm:col-span-2 space-y-1.5">
+              <Label className="text-xs font-semibold">Description / Scope Notes</Label>
+              <Textarea
+                rows={3}
+                value={editProjForm.description}
+                onChange={(e) => setEditProjForm({ ...editProjForm, description: e.target.value })}
+                placeholder="Scope of work and project notes..."
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="pt-2 border-t">
+            <Button
+              variant="outline"
+              onClick={() => setEditProjectOpen(false)}
+              disabled={updateProject.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveProject}
+              disabled={updateProject.isPending || !editProjForm.name.trim()}
+              className="gap-2"
+            >
+              {updateProject.isPending ? "Saving to Database..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
