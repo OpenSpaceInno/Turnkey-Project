@@ -15,38 +15,51 @@ if (!dbUrl) {
   );
 }
 
-export function getSanitizedDbInfo() {
+export function parseDatabaseConfig(urlStr: string) {
   try {
-    const url = new URL(dbUrl);
+    const url = new URL(urlStr);
     return {
       host: url.hostname,
-      port: url.port || "3306",
-      user: url.username,
-      database: url.pathname.replace(/^\//, ""),
-      configured: true,
+      port: Number(url.port) || 3306,
+      user: decodeURIComponent(url.username),
+      password: decodeURIComponent(url.password),
+      database: url.pathname.replace(/^\//, "") || "default",
+      multipleStatements: true,
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0,
+      connectTimeout: 7000,
+      enableKeepAlive: true,
+      keepAliveInitialDelay: 10000,
     };
   } catch {
     return {
-      host: "unparseable",
-      port: "3306",
-      user: "unknown",
-      database: "unknown",
-      configured: false,
+      uri: urlStr,
+      multipleStatements: true,
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0,
+      connectTimeout: 7000,
+      enableKeepAlive: true,
+      keepAliveInitialDelay: 10000,
     };
   }
 }
 
-export const pool = mysql.createPool({
-  uri: dbUrl,
-  multipleStatements: true,
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-  connectTimeout: 5000, // Fail fast in 5s instead of hanging 40s on unreachable hosts
-  enableKeepAlive: true,
-  keepAliveInitialDelay: 10000,
-});
+export function getSanitizedDbInfo() {
+  const cfg = parseDatabaseConfig(dbUrl);
+  return {
+    host: cfg.host || "unknown",
+    port: String(cfg.port || 3306),
+    user: cfg.user || "unknown",
+    database: cfg.database || "unknown",
+    configured: true,
+  };
+}
 
+const poolConfig = parseDatabaseConfig(dbUrl);
+
+export const pool = mysql.createPool(poolConfig as any);
 export const db = drizzle(pool, { schema, mode: "default" });
 
 export * from "./schema";
