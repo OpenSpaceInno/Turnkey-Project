@@ -40,6 +40,7 @@ COPY --from=builder /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/lib ./lib
 COPY --from=builder /app/deploy ./deploy
+COPY --from=builder /app/scripts ./scripts
 
 # Copy compiled backend API server
 COPY --from=builder /app/artifacts/api-server/dist ./artifacts/api-server/dist

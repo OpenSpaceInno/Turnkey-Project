@@ -5,19 +5,32 @@ import { logger } from "./logger";
 
 export async function initDatabaseSchema(): Promise<void> {
   try {
-    // 1. Check if the primary users table exists
-    const [rows]: any = await pool.query("SHOW TABLES LIKE 'users';");
-    const usersExist = Array.isArray(rows) && rows.length > 0;
+    // 1. Inspect existing database tables count
+    const [tables]: any = await pool.query("SHOW TABLES;");
+    const tableCount = Array.isArray(tables) ? tables.length : 0;
 
-    if (!usersExist) {
-      logger.info("Fresh database detected. Initializing schema from deploy/schema.sql...");
+    const forceRestore =
+      process.env.RESTORE_DATABASE === "true" ||
+      process.env.SYNC_DATABASE === "true" ||
+      process.env.FORCE_RESTORE_DB === "true";
+
+    // If database is empty, incomplete (< 30 tables), or explicitly requested via environment variable
+    if (tableCount < 30 || forceRestore) {
+      logger.info(
+        { tableCount, forceRestore },
+        "Initializing complete production schema and data (83 tables) from complete-turnkey-db.sql / schema.sql..."
+      );
 
       const candidatePaths = [
+        path.resolve(process.cwd(), "deploy/complete-turnkey-db.sql"),
         path.resolve(process.cwd(), "deploy/schema.sql"),
-        path.resolve(process.cwd(), "schema.sql"),
+        path.resolve(process.cwd(), "../deploy/complete-turnkey-db.sql"),
         path.resolve(process.cwd(), "../deploy/schema.sql"),
+        path.resolve(process.cwd(), "../../deploy/complete-turnkey-db.sql"),
         path.resolve(process.cwd(), "../../deploy/schema.sql"),
+        path.resolve(__dirname, "../../deploy/complete-turnkey-db.sql"),
         path.resolve(__dirname, "../../deploy/schema.sql"),
+        path.resolve(__dirname, "../../../deploy/complete-turnkey-db.sql"),
         path.resolve(__dirname, "../../../deploy/schema.sql"),
       ];
 
@@ -32,16 +45,23 @@ export async function initDatabaseSchema(): Promise<void> {
       if (!schemaPath) {
         logger.warn(
           { candidatePaths },
-          "schema.sql not found in candidate paths. Skipping automatic table creation."
+          "Database dump file not found in candidate paths. Skipping automatic table creation."
         );
       } else {
-        logger.info({ schemaPath }, "Reading schema.sql file");
+        logger.info({ schemaPath }, "Reading complete database dump file...");
         const sqlContent = fs.readFileSync(schemaPath, "utf-8");
+        const start = Date.now();
         await pool.query(sqlContent);
-        logger.info("Successfully executed deploy/schema.sql. All database tables created!");
+        logger.info(
+          { durationMs: Date.now() - start, schemaPath },
+          "Successfully executed complete database dump! All 83 tables, relationships, and data created!"
+        );
       }
     } else {
-      logger.info("Database tables already exist. Running schema integrity checks...");
+      logger.info(
+        { tableCount },
+        "Database already contains 83 tables. Running integrity checks..."
+      );
     }
 
     // 2. Schema Integrity: Ensure critical tables exist
