@@ -453,19 +453,6 @@ router.get("/dashboard/summary", async (req, res): Promise<void> => {
     });
   }
 
-  // Check 4: Site Execution & Measurements (For Site Engineers)
-  if (me.activeRole === "engineer") {
-    nextActions.push({
-      id: "site-execution-log",
-      priority: "medium",
-      category: "Execution",
-      title: "Log Daily Site Progress & Contractor Measurements (JMR)",
-      description: "Record physical execution and verified quantities against project milestones.",
-      actionText: "Record Progress",
-      actionUrl: "/projects",
-    });
-  }
-
   // Project Health overview (Budget health hidden for non-financial roles)
   const punchListCounts = await db
     .select({
@@ -477,6 +464,41 @@ router.get("/dashboard/summary", async (req, res): Promise<void> => {
     .groupBy(punchListItemsTable.projectId);
 
   const punchMap = new Map(punchListCounts.map((r) => [r.projectId, Number(r.openCount)]));
+
+  // Check 4: Site Execution & Measurements (For Site Engineers)
+  if (me.activeRole === "engineer" || me.activeRole === "site_engineer") {
+    nextActions.push({
+      id: "site-execution-log",
+      priority: "high",
+      category: "Site Execution",
+      title: "Log Daily Site Progress (DPR)",
+      description: "Submit today's labor, equipment usage, and physical work completed on site.",
+      actionText: "Log DPR",
+      actionUrl: "/site-execution?tab=daily-reports",
+    });
+    nextActions.push({
+      id: "site-measurements-jmr",
+      priority: "medium",
+      category: "Measurements",
+      title: "Record Joint Measurements (JMR)",
+      description: "Record verified field measurements for contractor bills and milestones.",
+      actionText: "Record JMR",
+      actionUrl: "/ra-bills?tab=work-completions",
+    });
+
+    const totalOpenSnags = Array.from(punchMap.values()).reduce((a, b) => a + b, 0);
+    if (totalOpenSnags > 0) {
+      nextActions.push({
+        id: "site-snags-clearance",
+        priority: "high",
+        category: "Quality & Safety",
+        title: `${totalOpenSnags} Open Snag(s) Pending Resolution`,
+        description: "Inspect reported defects and de-snag items on site with photographic proof.",
+        actionText: "Inspect Snags",
+        actionUrl: "/quality-safety?tab=snag-list",
+      });
+    }
+  }
 
   const projectHealth = myProjectsRaw.slice(0, 5).map((p) => {
     const openSnags = punchMap.get(p.id) || 0;
