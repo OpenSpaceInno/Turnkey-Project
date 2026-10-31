@@ -79,6 +79,18 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.DOCUMENT_MANAGE,
   ],
 
+  site_engineer: [
+    PERMISSIONS.PROJECT_VIEW,
+    PERMISSIONS.TASK_VIEW,
+    PERMISSIONS.TASK_MANAGE,
+    PERMISSIONS.PROCUREMENT_VIEW,
+    PERMISSIONS.PROCUREMENT_CREATE,
+    PERMISSIONS.EXECUTION_MEASURE_CREATE,
+    PERMISSIONS.QUALITY_MANAGE,
+    PERMISSIONS.DOCUMENT_VIEW,
+    PERMISSIONS.DOCUMENT_MANAGE,
+  ],
+
   accountant: [
     PERMISSIONS.PROJECT_VIEW,
     PERMISSIONS.PROJECT_BUDGET_VIEW,
@@ -162,16 +174,20 @@ export function usePermissions() {
     [user, activeRole, userPermissions]
   );
 
+  const isSiteEngineer = activeRole === "engineer" || activeRole === "site_engineer";
+
   const canViewFinancials =
-    activeRole === "admin" ||
-    activeRole === "accountant" ||
-    userPermissions.includes(PERMISSIONS.PROJECT_BUDGET_VIEW);
+    !isSiteEngineer &&
+    (activeRole === "admin" ||
+      activeRole === "accountant" ||
+      userPermissions.includes(PERMISSIONS.PROJECT_BUDGET_VIEW));
 
   const canViewCommercial =
-    activeRole === "admin" ||
-    activeRole === "accountant" ||
-    activeRole === "procurement_officer" ||
-    userPermissions.includes(PERMISSIONS.PROCUREMENT_COMMERCIAL_VIEW);
+    !isSiteEngineer &&
+    (activeRole === "admin" ||
+      activeRole === "accountant" ||
+      activeRole === "procurement_officer" ||
+      userPermissions.includes(PERMISSIONS.PROCUREMENT_COMMERCIAL_VIEW));
 
   return {
     user,
@@ -187,7 +203,7 @@ export function usePermissions() {
     canViewCommercial,
     isAdmin: activeRole === "admin",
     isProjectManager: activeRole === "project_manager",
-    isEngineer: activeRole === "engineer",
+    isEngineer: activeRole === "engineer" || activeRole === "site_engineer",
     isAccountant: activeRole === "accountant",
     isProcurementOfficer: activeRole === "procurement_officer",
     isViewer: activeRole === "viewer",

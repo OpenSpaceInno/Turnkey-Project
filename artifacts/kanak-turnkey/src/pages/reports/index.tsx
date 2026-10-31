@@ -69,6 +69,8 @@ export default function ReportsPage() {
   const search = useSearch();
   const { toast } = useToast();
   const { isAdmin, activeRole, canViewFinancials } = usePermissions();
+  const isSiteEngineer = activeRole === "engineer" || activeRole === "site_engineer";
+  const canAccessBudget = isAdmin || (canViewFinancials && !isSiteEngineer);
 
   const tabFromUrl = new URLSearchParams(search).get("tab") || "hub";
   const [activeTab, setActiveTab] = useState<string>(tabFromUrl);
@@ -219,9 +221,11 @@ export default function ReportsPage() {
             <div className="text-2xl font-bold text-foreground">
               {filteredProjects.length}
             </div>
+            {canAccessBudget && (
             <p className="text-[11px] text-muted-foreground">
               Total Budget: {INR.format(totalPortfolioBudget)}
             </p>
+            )}
           </CardContent>
         </Card>
 
@@ -237,6 +241,7 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
 
+        {canAccessBudget && (
         <Card className="border shadow-sm bg-card hover:border-indigo-500/40 transition-colors">
           <CardContent className="p-4 space-y-1">
             <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
@@ -250,6 +255,7 @@ export default function ReportsPage() {
             </p>
           </CardContent>
         </Card>
+        )}
 
         <Card className="border shadow-sm bg-card hover:border-teal-500/40 transition-colors">
           <CardContent className="p-4 space-y-1">
@@ -277,18 +283,24 @@ export default function ReportsPage() {
             <TrendingUp className="h-3.5 w-3.5" />
             Progress & S-Curve
           </TabsTrigger>
+          {canAccessBudget && (
           <TabsTrigger value="project-pnl" className="gap-2 text-xs py-2 px-3">
             <DollarSign className="h-3.5 w-3.5" />
             Project P&L Statement
           </TabsTrigger>
+          )}
+          {canAccessBudget && (
           <TabsTrigger value="evm-analysis" className="gap-2 text-xs py-2 px-3">
             <Activity className="h-3.5 w-3.5" />
             EVM Cost Variance
           </TabsTrigger>
+          )}
+          {canAccessBudget && (
           <TabsTrigger value="cash-flow" className="gap-2 text-xs py-2 px-3">
             <Wallet className="h-3.5 w-3.5" />
             Cash Flow Statement
           </TabsTrigger>
+          )}
           <TabsTrigger value="procurement-summary" className="gap-2 text-xs py-2 px-3">
             <Package className="h-3.5 w-3.5" />
             Procurement Summary

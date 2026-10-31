@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { usePermissions } from "@workspace/api-client-react";
 import {
   DollarSign, TrendingUp, AlertTriangle, CheckCircle2,
   Printer, Download, Plus, Filter, Search, Edit3, Trash2,
@@ -54,6 +55,8 @@ export function ProjectBudgetTab({
 }: BudgetVarianceReportProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { canViewFinancials, activeRole, isAdmin } = usePermissions();
+  const isSiteEngineer = activeRole === "engineer" || activeRole === "site_engineer";
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState("");
@@ -82,7 +85,7 @@ export function ProjectBudgetTab({
       if (!res.ok) throw new Error("Failed to load budget variance report");
       return res.json();
     },
-    enabled: !!projectId && projectId > 0,
+    enabled: !!projectId && projectId > 0 && !isSiteEngineer && (isAdmin || canViewFinancials),
   });
 
   const summary = reportData?.summary || {
@@ -122,6 +125,18 @@ export function ProjectBudgetTab({
       return true;
     });
   }, [items, selectedCategory, healthFilter, searchQuery]);
+
+  if (!isAdmin && (!canViewFinancials || isSiteEngineer)) {
+    return (
+      <div className="p-8 text-center rounded-xl border border-dashed text-muted-foreground space-y-2">
+        <ShieldAlert className="h-8 w-8 mx-auto text-amber-500 opacity-80" />
+        <h3 className="font-semibold text-base text-foreground">Budget Module Access Restricted</h3>
+        <p className="text-xs max-w-md mx-auto">
+          Monetary cost codes, budget baselines, and project variances are restricted to Authorized Finance and Management roles.
+        </p>
+      </div>
+    );
+  }
 
   // Open Add Dialog
   const handleOpenAdd = () => {

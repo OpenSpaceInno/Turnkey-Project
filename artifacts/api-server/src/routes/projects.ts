@@ -1739,6 +1739,11 @@ router.post("/punch-list-items/:id/comments", async (req, res): Promise<void> =>
 });
 
 router.get("/projects/:projectId/budget", async (req, res): Promise<void> => {
+  const me = await getCurrentUser(req);
+  if (!canViewFinancials(me)) {
+    res.status(403).json({ error: "Access denied. Budget module is restricted for Site Engineers." });
+    return;
+  }
   const pid = parseInt(req.params.projectId as string, 10);
   const rows = await db
     .select()
@@ -1864,6 +1869,11 @@ function computeProjectBudgetVariance(project: any, rawBudgetItems: any[]) {
 
 // FR-BUD-03: Project-level budget variance report endpoint
 router.get("/projects/:projectId/budget-variance", async (req, res): Promise<void> => {
+  const me = await getCurrentUser(req);
+  if (!canViewFinancials(me)) {
+    res.status(403).json({ error: "Access denied. Budget variance report is restricted." });
+    return;
+  }
   const pid = parseInt(req.params.projectId as string, 10);
   if (isNaN(pid) || pid <= 0) {
     res.status(400).json({ error: "Invalid project ID" });
@@ -1891,6 +1901,11 @@ router.get("/projects/:projectId/budget-variance", async (req, res): Promise<voi
 
 // Reports Hub: Portfolio & Project Budget Variance Analysis endpoint
 router.get("/reports/budget-variance", async (req, res): Promise<void> => {
+  const me = await getCurrentUser(req);
+  if (!canViewFinancials(me)) {
+    res.status(403).json({ error: "Access denied. Budget variance report is restricted." });
+    return;
+  }
   const projectIdParam = req.query.projectId as string | undefined;
 
   if (projectIdParam && projectIdParam !== "all") {
@@ -1942,6 +1957,11 @@ router.get("/reports/budget-variance", async (req, res): Promise<void> => {
 });
 
 router.post("/projects/:projectId/budget", async (req, res): Promise<void> => {
+  const me = await getCurrentUser(req);
+  if (!canViewFinancials(me)) {
+    res.status(403).json({ error: "Access denied. Budget creation is restricted." });
+    return;
+  }
   const pid = parseInt(req.params.projectId as string, 10);
   const b = req.body ?? {};
   const result = await db
@@ -1968,6 +1988,11 @@ router.post("/projects/:projectId/budget", async (req, res): Promise<void> => {
 });
 
 router.patch("/budget-items/:id", async (req, res): Promise<void> => {
+  const me = await getCurrentUser(req);
+  if (!canViewFinancials(me)) {
+    res.status(403).json({ error: "Access denied. Budget modification is restricted." });
+    return;
+  }
   const id = parseInt(req.params.id as string, 10);
   const b = req.body ?? {};
   const update: Record<string, unknown> = {};
@@ -1998,6 +2023,11 @@ router.patch("/budget-items/:id", async (req, res): Promise<void> => {
 });
 
 router.post("/budget-items", async (req, res): Promise<void> => {
+  const me = await getCurrentUser(req);
+  if (!canViewFinancials(me)) {
+    res.status(403).json({ error: "Access denied. Budget creation is restricted." });
+    return;
+  }
   const b = req.body ?? {};
   const pid = parseInt((b.projectId || req.params.projectId) as string, 10);
   if (!pid) {
@@ -2027,6 +2057,11 @@ router.post("/budget-items", async (req, res): Promise<void> => {
 });
 
 router.delete("/budget-items/:id", async (req, res): Promise<void> => {
+  const me = await getCurrentUser(req);
+  if (!canViewFinancials(me)) {
+    res.status(403).json({ error: "Access denied. Budget deletion is restricted." });
+    return;
+  }
   const id = parseInt(req.params.id as string, 10);
   await db.delete(budgetItemsTable).where(eq(budgetItemsTable.id, id));
   res.sendStatus(204);

@@ -162,7 +162,8 @@ export default function ProjectDetail() {
 
   const enabled = !!projectId;
   const { data: tasks, refetch: refetchTasks } = useListTasks({ projectId }, { query: { enabled, queryKey: (getListTasksQueryKey as any)({ projectId }) } });
-  const { data: budgetItems }  = useListBudgetItems(projectId, { query: { enabled, queryKey: getListBudgetItemsQueryKey(projectId) } });
+  const isSiteEngineer = activeRole === "engineer" || activeRole === "site_engineer";
+  const { data: budgetItems }  = useListBudgetItems(projectId, { query: { enabled: enabled && canViewFinancials && !isSiteEngineer, queryKey: getListBudgetItemsQueryKey(projectId) } });
   const { data: raBills }      = useListRaBills({ projectId }, { query: { enabled, queryKey: getListRaBillsQueryKey({ projectId }) } });
   const { data: stakeholders } = useListStakeholders({ projectId }, { query: { enabled, queryKey: getListStakeholdersQueryKey({ projectId }) } });
   const { data: documents }    = useListDocuments({ projectId }, { query: { enabled, queryKey: getListDocumentsQueryKey({ projectId }) } });
@@ -752,12 +753,14 @@ export default function ProjectDetail() {
                   <span className="text-muted-foreground">Team Size</span>
                   <span className="font-medium">{project.teamSize || "N/A"}</span>
                 </div>
+                {canViewFinancials && !isSiteEngineer && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Budget</span>
                   <span className="font-medium">
                     <MaskedFinancialValue value={project.budget} />
                   </span>
                 </div>
+                )}
                 {project.startDate && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Start</span>
@@ -861,11 +864,11 @@ export default function ProjectDetail() {
                 { value: "journey",       label: "🚀 Turnkey Lifecycle Map", show: true },
                 { value: "procurement",   label: "🛒 Procurement & Supply", show: isAdmin || activeRole === "project_manager" || activeRole === "procurement_officer" || activeRole === "engineer" },
                 { value: "execution",     label: "🏗️ Execution & Measurement", show: true },
-                { value: "commercial",    label: "💰 Commercial & Finance", show: canViewFinancials },
+                { value: "commercial",    label: "💰 Commercial & Finance", show: canViewFinancials && !isSiteEngineer },
                 { value: "vendors",       label: "🤝 Trade Vendors", show: isAdmin || activeRole === "project_manager" || activeRole === "procurement_officer" || activeRole === "accountant" },
                 { value: "tasks",         label: `Tasks (${projectTasks.length})`, show: true },
                 { value: "punchlist",     label: `Punch List (${openPunch} open)`, show: true },
-                { value: "budget",        label: `Budget (${projectBudget.length})`, show: canViewFinancials },
+                { value: "budget",        label: `Budget (${projectBudget.length})`, show: canViewFinancials && !isSiteEngineer },
                 { value: "stakeholders",  label: `Stakeholders (${projectStakeholders.length})`, show: true },
                 { value: "documents",     label: `Documents (${projectDocs.length})`, show: true },
               ]
@@ -1413,6 +1416,7 @@ export default function ProjectDetail() {
               </Dialog>
 
               {/* ── Budget & Cost Variance (FR-BUD-03) ── */}
+              {canViewFinancials && !isSiteEngineer && (
               <TabsContent value="budget" className="m-0 space-y-4">
                 <PermissionGate
                   permission={PERMISSIONS.PROJECT_BUDGET_VIEW}
@@ -1430,8 +1434,10 @@ export default function ProjectDetail() {
                   />
                 </PermissionGate>
               </TabsContent>
+              )}
 
               {/* ── Commercial & Finance (Client AR, Vendor AP, Site Expenses, Profitability) ── */}
+              {canViewFinancials && !isSiteEngineer && (
               <TabsContent value="commercial" className="m-0 space-y-6">
                 <PermissionGate
                   permission={PERMISSIONS.PROJECT_BUDGET_VIEW}
@@ -1450,8 +1456,10 @@ export default function ProjectDetail() {
                   />
                 </PermissionGate>
               </TabsContent>
+              )}
 
               {/* Backward compatibility for ?tab=rabills query links */}
+              {canViewFinancials && !isSiteEngineer && (
               <TabsContent value="rabills" className="m-0 space-y-6">
                 <ProjectCommercialControl
                   projectId={projectId}
@@ -1460,6 +1468,7 @@ export default function ProjectDetail() {
                   clientName={project.clientName || undefined}
                 />
               </TabsContent>
+              )}
 
               {/* ── RA Bill Detail Dialog ── */}
               <Dialog open={!!selectedBill} onOpenChange={(o) => !o && setSelectedBill(null)}>
@@ -1899,6 +1908,7 @@ export default function ProjectDetail() {
               />
             </div>
 
+            {(isAdmin || activeRole === "project_manager" || activeRole === "accountant") && (
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Contract Budget (₹)</Label>
               <Input
@@ -1908,6 +1918,7 @@ export default function ProjectDetail() {
                 placeholder="e.g. 32500000"
               />
             </div>
+            )}
 
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Location</Label>

@@ -81,6 +81,18 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.DOCUMENT_MANAGE,
   ],
 
+  site_engineer: [
+    PERMISSIONS.PROJECT_VIEW,
+    PERMISSIONS.TASK_VIEW,
+    PERMISSIONS.TASK_MANAGE,
+    PERMISSIONS.PROCUREMENT_VIEW,
+    PERMISSIONS.PROCUREMENT_CREATE,
+    PERMISSIONS.EXECUTION_MEASURE_CREATE,
+    PERMISSIONS.QUALITY_MANAGE,
+    PERMISSIONS.DOCUMENT_VIEW,
+    PERMISSIONS.DOCUMENT_MANAGE,
+  ],
+
   accountant: [
     PERMISSIONS.PROJECT_VIEW,
     PERMISSIONS.PROJECT_BUDGET_VIEW,
@@ -198,6 +210,7 @@ export async function hasProjectAccess(
  * Helper to check if user is allowed to view project financial values (budgets, costs, margins).
  */
 export function canViewFinancials(user: CurrentUser): boolean {
+  if (user.activeRole === "engineer" || user.activeRole === "site_engineer") return false;
   return user.activeRole === "admin" || user.activeRole === "accountant";
 }
 
@@ -205,6 +218,7 @@ export function canViewFinancials(user: CurrentUser): boolean {
  * Helper to check if user is allowed to view commercial prices (unit rates, PO total amounts).
  */
 export function canViewCommercial(user: CurrentUser): boolean {
+  if (user.activeRole === "engineer" || user.activeRole === "site_engineer") return false;
   return (
     user.activeRole === "admin" ||
     user.activeRole === "accountant" ||

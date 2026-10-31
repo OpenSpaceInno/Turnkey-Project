@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { useListProjects, useDeleteProject } from "@workspace/api-client-react";
+import { useListProjects, useDeleteProject, usePermissions } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -50,6 +50,9 @@ const STATUS_STYLE: Record<
 export default function Projects() {
   const [, navigate] = useLocation();
   const { data: projects, isLoading } = useListProjects();
+  const { canViewFinancials, activeRole, isAdmin } = usePermissions();
+  const isSiteEngineer = activeRole === "engineer" || activeRole === "site_engineer";
+  const canAccessBudget = isAdmin || (canViewFinancials && !isSiteEngineer);
   const [search, setSearch] = useState("");
   const [projectToDelete, setProjectToDelete] = useState<any | null>(null);
 
@@ -258,16 +261,22 @@ export default function Projects() {
 
                 {/* Footer */}
                 <div className="flex items-center justify-between pt-2 border-t mt-1">
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <IndianRupee className="h-3.5 w-3.5" />
-                    <span className="font-medium">
-                      {project.budget
-                        ? new Intl.NumberFormat("en-IN", {
-                            maximumFractionDigits: 0,
-                          }).format(project.budget)
-                        : "Budget TBD"}
-                    </span>
-                  </div>
+                  {canAccessBudget ? (
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <IndianRupee className="h-3.5 w-3.5" />
+                      <span className="font-medium">
+                        {project.budget
+                          ? new Intl.NumberFormat("en-IN", {
+                              maximumFractionDigits: 0,
+                            }).format(project.budget)
+                          : "Budget TBD"}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="text-xs text-muted-foreground font-medium">
+                      <span>{project.type || "Turnkey Project"}</span>
+                    </div>
+                  )}
                   <Link
                     href={`/projects/${project.id}`}
                     className="text-xs text-primary font-medium flex items-center gap-1 hover:underline"

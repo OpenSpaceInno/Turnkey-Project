@@ -91,7 +91,9 @@ export default function SiteExecutionPage() {
   const [location, setLocation] = useLocation();
   const search = useSearch();
   const { toast } = useToast();
-  const { isAdmin, activeRole } = usePermissions();
+  const { isAdmin, activeRole, canViewFinancials } = usePermissions();
+  const isSiteEngineer = activeRole === "engineer" || activeRole === "site_engineer";
+  const canAccessBudget = isAdmin || (canViewFinancials && !isSiteEngineer);
   const queryClient = useQueryClient();
 
   // Parse active tab from URL query param if present
@@ -785,7 +787,9 @@ export default function SiteExecutionPage() {
                           </p>
                           <div className="flex items-center gap-3 text-[11px] text-muted-foreground pt-1">
                             <span>Type: {p.type || "Turnkey EPC"}</span>
-                            <span>Budget: {INR.format(p.budget || 0)}</span>
+                            {canAccessBudget && (
+                              <span>Budget: {INR.format(p.budget || 0)}</span>
+                            )}
                           </div>
                         </div>
 

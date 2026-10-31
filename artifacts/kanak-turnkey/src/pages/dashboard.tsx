@@ -393,12 +393,14 @@ export default function Dashboard() {
                   <CardContent className="p-4 pt-2 space-y-3">
                     <Progress value={p.progress} className="h-1.5" />
 
+                    {canViewFinancials && activeRole !== "engineer" && activeRole !== "site_engineer" && (
                     <div className="flex items-center justify-between text-xs pt-1 border-t">
                       <span className="text-muted-foreground">Budget</span>
                       <span className="font-semibold text-foreground">
                         <MaskedFinancialValue value={p.budget} />
                       </span>
                     </div>
+                    )}
 
                     <div className="bg-muted/40 rounded-lg p-2 text-xs flex items-center justify-between gap-2">
                       <div className="min-w-0">

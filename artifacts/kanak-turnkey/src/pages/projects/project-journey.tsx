@@ -4,6 +4,7 @@ import {
   useGetProjectJourney,
   useSeedProjectJourney,
   useGetProjectSetupChecklist,
+  usePermissions,
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -105,6 +106,9 @@ export function ProjectJourneyView({ projectId, initialPhaseId, onNavigateTab }:
   const { data: setupChecklist, refetch: refetchChecklist } = useGetProjectSetupChecklist(projectId);
   const seedMutation = useSeedProjectJourney();
   const { toast } = useToast();
+  const { canViewFinancials, activeRole, isAdmin } = usePermissions();
+  const isSiteEngineer = activeRole === "engineer" || activeRole === "site_engineer";
+  const canAccessBudget = isAdmin || (canViewFinancials && !isSiteEngineer);
 
   const [activePhaseId, setActivePhaseId] = useState<number>(() => {
     if (initialPhaseId && [1, 2, 3, 4].includes(initialPhaseId)) {
@@ -230,8 +234,8 @@ export function ProjectJourneyView({ projectId, initialPhaseId, onNavigateTab }:
       description: "Approved monetary budget allocated for execution.",
       completed: true,
       actionUrl: "",
-      actionLabel: "Review Budget",
-      navigateTab: "budget",
+      actionLabel: canAccessBudget ? "Review Budget" : "Baseline Approved",
+      navigateTab: canAccessBudget ? "budget" : undefined,
     },
     {
       key: "contract",
@@ -342,7 +346,7 @@ export function ProjectJourneyView({ projectId, initialPhaseId, onNavigateTab }:
               </h1>
 
               <p className="text-muted-foreground text-xs md:text-sm">
-                Client: <strong className="text-foreground">{project.clientName}</strong> &bull; Location: {project.location || "Mumbai"} &bull; Total Contract Value: <strong className="text-foreground">{INR.format(contractBudget)}</strong>
+                Client: <strong className="text-foreground">{project.clientName}</strong> &bull; Location: {project.location || "Mumbai"}{canAccessBudget ? <> &bull; Total Contract Value: <strong className="text-foreground">{INR.format(contractBudget)}</strong></> : null}
               </p>
 
               {project.description && (
@@ -385,6 +389,7 @@ export function ProjectJourneyView({ projectId, initialPhaseId, onNavigateTab }:
           <Separator />
 
           {/* ── 2. Simple, Understandable Financial Summary Cards ── */}
+          {canAccessBudget && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="bg-muted/30 border rounded-xl p-3.5 space-y-1">
               <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">
@@ -437,6 +442,7 @@ export function ProjectJourneyView({ projectId, initialPhaseId, onNavigateTab }:
               </span>
             </div>
           </div>
+          )}
         </CardContent>
       </Card>
 
@@ -769,6 +775,7 @@ export function ProjectJourneyView({ projectId, initialPhaseId, onNavigateTab }:
                   </div>
 
                   {/* ── Allocated Budget Packages & Tasks ── */}
+                  {canAccessBudget && (
                   <div className="space-y-3 pt-2">
                     <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                       <Building2 className="h-4 w-4 text-sky-600" /> Allocated Budget Packages & Cost Codes
@@ -788,9 +795,8 @@ export function ProjectJourneyView({ projectId, initialPhaseId, onNavigateTab }:
                         </div>
                       ))}
                     </div>
-
-
                   </div>
+                  )}
                 </div>
               )}
 
@@ -987,7 +993,11 @@ export function ProjectJourneyView({ projectId, initialPhaseId, onNavigateTab }:
                   <div className="absolute -left-[31px] top-1.5 w-4 h-4 rounded-full bg-primary border-2 border-background" />
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                     <div className="font-bold text-sm text-foreground">1. Tender Award & Master Contract</div>
-                    <Badge variant="outline" className="text-xs font-mono w-fit">{INR.format(contractBudget)}</Badge>
+                    {canAccessBudget ? (
+                      <Badge variant="outline" className="text-xs font-mono w-fit">{INR.format(contractBudget)}</Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-xs font-mono w-fit">Turnkey Tender</Badge>
+                    )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">Commercial contract with BlueWave Hospitality establishing ₹8.50 Cr ceiling baseline.</p>
                 </div>
@@ -1201,7 +1211,7 @@ export function ProjectJourneyView({ projectId, initialPhaseId, onNavigateTab }:
                   </div>
                   <div>
                     <span className="text-muted-foreground block text-[11px] font-medium">Total Contract Value</span>
-                    <span className="font-bold text-primary">{INR.format(contractBudget)}</span>
+                    <span className="font-bold text-primary">{canAccessBudget ? INR.format(contractBudget) : "Turnkey Contract"}</span>
                   </div>
                 </div>
 
