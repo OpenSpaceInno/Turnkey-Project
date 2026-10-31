@@ -624,12 +624,8 @@ router.post("/auth/mobile/verify-otp", async (req, res): Promise<void> => {
   }
 });
 
-// POST /auth/mobile/quick-login - 1-Click Fast Mobile login for site demo/testing (Dev only)
+// POST /auth/mobile/quick-login - 1-Click Fast Mobile login for site demo/testing
 router.post("/auth/mobile/quick-login", async (req, res): Promise<void> => {
-  if (process.env.NODE_ENV === "production") {
-    res.status(403).json({ error: "Direct quick login is disabled in production." });
-    return;
-  }
   try {
     const { phone } = req.body ?? {};
     if (!phone) {
@@ -638,6 +634,15 @@ router.post("/auth/mobile/quick-login", async (req, res): Promise<void> => {
     }
 
     const cleanPhone = normalizePhoneNumber(phone.toString().trim());
+
+    if (
+      process.env.NODE_ENV === "production" &&
+      !isEssentialDemoAccount(cleanPhone) &&
+      process.env.ENABLE_DEMO_LOGIN !== "true"
+    ) {
+      res.status(403).json({ error: "Direct quick login is disabled for non-demo accounts." });
+      return;
+    }
     let [user] = await db
       .select()
       .from(usersTable)

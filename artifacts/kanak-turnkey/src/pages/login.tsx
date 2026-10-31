@@ -35,6 +35,7 @@ import {
   QrCode,
   Copy,
   Check,
+  Sparkles,
 } from "lucide-react";
 
 export default function LoginPage() {
@@ -255,25 +256,73 @@ export default function LoginPage() {
     }
   };
 
-  // -------------------------------------------------------------
-  // Standard Corporate Email & Password Auth Handlers
-  // -------------------------------------------------------------
-  const handleEmailLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanEmail = email.trim();
-    const cleanPassword = password.trim();
+  // Demo Accounts for Quick One-Click Sign In (Site Engineer, PM, Admin)
+  const DEMO_USERS = [
+    { name: "Priya Iyer", role: "Site Engineer", email: "priya.iyer@kanak.in", phone: "9876543213", badge: "Site Execution" },
+    { name: "Rohan Mehta", role: "Project Manager", email: "rohan.mehta@kanak.in", phone: "9876543212", badge: "Operations" },
+    { name: "Ananya Rao", role: "Admin", email: "ananya.rao@kanak.in", phone: "9876543210", badge: "Executive" },
+    { name: "Harinarayana", role: "Director / Admin", email: "Hari.mailapalli12@gmail.com", phone: "9876543211", badge: "Management" },
+  ];
 
-    if (!cleanEmail || !cleanPassword) {
+  const handleQuickMobileLogin = async (targetPhone: string) => {
+    setIsLoading(true);
+    try {
+      const response = await fetch("/api/auth/mobile/quick-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: targetPhone }),
+        credentials: "include",
+      });
+
+      let data: any = {};
+      try {
+        data = await response.json();
+      } catch {
+        data = { error: `Server response error (${response.status})` };
+      }
+
+      if (response.ok) {
+        await queryClient.invalidateQueries();
+        toast({
+          title: "Authentication Successful",
+          description: `Welcome back, ${data.name}!`,
+        });
+        setLocation("/");
+        return;
+      }
+
+      // Fallback: verify-otp with demo master OTP 123456
+      const fallbackRes = await fetch("/api/auth/mobile/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: targetPhone, otp: "123456" }),
+        credentials: "include",
+      });
+
+      const fallbackData = await fallbackRes.json();
+      if (!fallbackRes.ok) {
+        throw new Error(fallbackData.error || data.error || "Failed to log in.");
+      }
+
+      await queryClient.invalidateQueries();
+      toast({
+        title: "Authentication Successful",
+        description: `Welcome back, ${fallbackData.name}!`,
+      });
+      setLocation("/");
+    } catch (err: any) {
       toast({
         variant: "destructive",
-        title: "Missing Credentials",
-        description: "Please enter both your email address and password.",
+        title: "Login Failed",
+        description: err.message || "Could not log in with mobile credentials.",
       });
-      return;
+    } finally {
+      setIsLoading(false);
     }
+  };
 
+  const performEmailLogin = async (cleanEmail: string, cleanPassword: string) => {
     setIsLoading(true);
-
     try {
       const response = await fetch("/api/auth/login", {
         method: "POST",
@@ -324,6 +373,26 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // -------------------------------------------------------------
+  // Standard Corporate Email & Password Auth Handlers
+  // -------------------------------------------------------------
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanEmail = email.trim();
+    const cleanPassword = password.trim();
+
+    if (!cleanEmail || !cleanPassword) {
+      toast({
+        variant: "destructive",
+        title: "Missing Credentials",
+        description: "Please enter both your email address and password.",
+      });
+      return;
+    }
+
+    await performEmailLogin(cleanEmail, cleanPassword);
   };
 
   const handleVerify2FA = async (e: React.FormEvent) => {
@@ -763,6 +832,41 @@ export default function LoginPage() {
                       "Sign In to Platform"
                     )}
                   </Button>
+
+                  {/* Quick Role Sign In Helper */}
+                  <div className="pt-3 border-t border-border/60 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Quick Role Sign In
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">Demo Accounts</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {DEMO_USERS.map((u) => (
+                        <button
+                          key={u.email}
+                          type="button"
+                          disabled={isLoading}
+                          onClick={() => {
+                            setEmail(u.email);
+                            setPassword("password123");
+                            performEmailLogin(u.email, "password123");
+                          }}
+                          className="flex flex-col p-2 rounded-xl border border-border/60 hover:border-primary/50 hover:bg-accent/40 transition-all text-left text-xs disabled:opacity-50 group bg-background/50"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-foreground text-[11px] group-hover:text-primary transition-colors truncate">
+                              {u.name}
+                            </span>
+                            <span className="text-[9px] font-medium px-1.5 py-0.2 rounded bg-primary/10 text-primary shrink-0">
+                              {u.role.replace("Site ", "")}
+                            </span>
+                          </div>
+                          <span className="text-muted-foreground text-[10px] truncate mt-0.5">{u.email}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </form>
               )}
 
@@ -813,6 +917,40 @@ export default function LoginPage() {
                         )}
                         <span>{isLoading ? "Sending Code..." : "Send Verification Code"}</span>
                       </Button>
+
+                      {/* Quick 1-Tap Mobile Access for Site Workers */}
+                      <div className="pt-3 border-t border-border/60 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Quick 1-Tap Mobile Access
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">Site Demo</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          {DEMO_USERS.map((u) => (
+                            <button
+                              key={u.phone}
+                              type="button"
+                              disabled={isLoading}
+                              onClick={() => {
+                                setPhone(u.phone);
+                                handleQuickMobileLogin(u.phone);
+                              }}
+                              className="flex flex-col p-2 rounded-xl border border-border/60 hover:border-primary/50 hover:bg-accent/40 transition-all text-left text-xs disabled:opacity-50 group bg-background/50"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-semibold text-foreground text-[11px] group-hover:text-primary transition-colors truncate">
+                                  {u.name}
+                                </span>
+                                <span className="text-[9px] font-medium px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-400 shrink-0">
+                                  {u.role.replace("Site ", "")}
+                                </span>
+                              </div>
+                              <span className="text-muted-foreground text-[10px] font-mono mt-0.5">+91 {u.phone}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   ) : (
                     /* OTP Verification Screen */

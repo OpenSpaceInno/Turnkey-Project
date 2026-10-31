@@ -909,7 +909,8 @@ export default function ProjectDetail() {
                     {projectTasks.filter(t => t.status === "completed").length}/{projectTasks.length} tasks complete
                   </div>
                   <div className="flex gap-2">
-                    {/* Apply Template Dialog */}
+                    {/* Apply Template Dialog (Restricted to PM and Admin) */}
+                    {(isAdmin || activeRole === "project_manager") && (
                     <Dialog open={applyOpen} onOpenChange={o => { setApplyOpen(o); if (!o) setSelectedTemplateId(""); }}>
                       <DialogTrigger asChild>
                         <Button size="sm" variant="outline" className="gap-2">
@@ -997,6 +998,7 @@ export default function ProjectDetail() {
                         </DialogFooter>
                       </DialogContent>
                     </Dialog>
+                    )}
                     <Dialog open={addTaskOpen} onOpenChange={setAddTaskOpen}>
                       <DialogTrigger asChild>
                         <Button size="sm"><Plus className="w-4 h-4 mr-2" /> Add Task</Button>
@@ -1054,7 +1056,7 @@ export default function ProjectDetail() {
                   projectStartDate={project?.startDate}
                   projectEndDate={project?.endDate}
                   onOpenAddTask={() => setAddTaskOpen(true)}
-                  onOpenApplyTemplate={() => setApplyOpen(true)}
+                  onOpenApplyTemplate={isAdmin || activeRole === "project_manager" ? () => setApplyOpen(true) : undefined}
                   renderStatusSelect={(task) => <TaskStatusSelect task={task} projectId={projectId} />}
                 />
               </TabsContent>

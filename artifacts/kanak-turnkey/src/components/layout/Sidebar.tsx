@@ -117,11 +117,19 @@ export function Sidebar() {
   // Dynamic permission and role access check
   const isItemVisible = (item: NavItem) => {
     if (isAdmin) return true;
-    if (item.permission && hasPermission(item.permission)) return true;
-    if (item.anyPermissions && hasAnyPermission(item.anyPermissions)) return true;
-    if (item.roles && item.roles.includes(activeRole)) return true;
-    if (!item.permission && !item.anyPermissions && (!item.roles || item.roles.length === 0)) return true;
-    return false;
+    // Explicit role restriction: activeRole must match if roles array specified
+    if (item.roles && item.roles.length > 0 && !item.roles.includes(activeRole)) {
+      return false;
+    }
+    // Specific permission requirement
+    if (item.permission && !hasPermission(item.permission)) {
+      return false;
+    }
+    // At least one permission requirement
+    if (item.anyPermissions && !hasAnyPermission(item.anyPermissions)) {
+      return false;
+    }
+    return true;
   };
 
   // 1. Core Primary Items (Sales & Projects)
