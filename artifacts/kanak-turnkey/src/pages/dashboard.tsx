@@ -23,7 +23,6 @@ import {
   Zap,
   ShieldCheck,
   AlertTriangle,
-  AlertCircle,
   Clock,
   CheckCircle2,
   TrendingUp,
@@ -140,13 +139,10 @@ export default function Dashboard() {
   const financials = summary.financials;
   const activeFinancials = financialsData || financials;
 
-  const isSiteEngineer = activeRole === "engineer" || activeRole === "site_engineer";
-
   const roleTitleMap: Record<string, string> = {
     admin: "Super Admin / Executive View",
     project_manager: "Project Management Operations",
-    engineer: "Site Engineering & Field Operations",
-    site_engineer: "Site Engineering & Field Operations",
+    engineer: "Site Engineering & Execution",
     accountant: "Finance & Accounts Command Center",
     procurement_officer: "Supply Chain & Procurement",
     viewer: "Operational Overview",
@@ -195,30 +191,14 @@ export default function Dashboard() {
             </>
           )}
 
-          {isSiteEngineer && (
+          {activeRole === "engineer" && (
             <>
               <Button
                 size="sm"
-                onClick={() => setLocation("/site-execution?tab=daily-reports")}
-                className="gap-1.5 shadow-sm font-semibold bg-primary text-primary-foreground"
-              >
-                <CalendarIcon className="h-4 w-4" /> Log DPR
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setLocation("/site-execution?tab=attendance")}
-                className="gap-1.5 font-medium"
-              >
-                <Users className="h-4 w-4" /> Attendance
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
                 onClick={() => setLocation("/ra-bills?tab=work-completions")}
-                className="gap-1.5 font-medium"
+                className="gap-1.5 shadow-sm font-semibold"
               >
-                <Layers className="h-4 w-4" /> Record JMR
+                <Layers className="h-4 w-4" /> Log Measurement (JMR)
               </Button>
               <Button
                 size="sm"
@@ -285,75 +265,10 @@ export default function Dashboard() {
             onClick={() => setLocation("/projects")}
             className="gap-1.5 font-medium"
           >
-            <Briefcase className="h-4 w-4" /> {isSiteEngineer ? "My Projects" : "All Projects"}
+            <Briefcase className="h-4 w-4" /> All Projects
           </Button>
         </div>
       </div>
-
-      {/* ── Site Engineer Field Operations Launch Strip ── */}
-      {isSiteEngineer && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 animate-in fade-in">
-          <Card 
-            className="border shadow-xs hover:border-primary/50 transition-all cursor-pointer bg-card hover:bg-muted/30"
-            onClick={() => setLocation("/site-execution?tab=daily-reports")}
-          >
-            <CardContent className="p-3.5 flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
-                <CalendarIcon className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-[10px] uppercase font-bold text-muted-foreground block">Daily Progress</span>
-                <span className="text-sm font-bold text-foreground truncate block">Submit DPR</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card 
-            className="border shadow-xs hover:border-primary/50 transition-all cursor-pointer bg-card hover:bg-muted/30"
-            onClick={() => setLocation("/site-execution?tab=attendance")}
-          >
-            <CardContent className="p-3.5 flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-blue-500/10 text-blue-600 flex items-center justify-center shrink-0">
-                <Users className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-[10px] uppercase font-bold text-muted-foreground block">Manpower</span>
-                <span className="text-sm font-bold text-foreground truncate block">Site Attendance</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card 
-            className="border shadow-xs hover:border-primary/50 transition-all cursor-pointer bg-card hover:bg-muted/30"
-            onClick={() => setLocation("/ra-bills?tab=work-completions")}
-          >
-            <CardContent className="p-3.5 flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
-                <Layers className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-[10px] uppercase font-bold text-muted-foreground block">Measurements</span>
-                <span className="text-sm font-bold text-foreground truncate block">Field JMR</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card 
-            className="border shadow-xs hover:border-primary/50 transition-all cursor-pointer bg-card hover:bg-muted/30"
-            onClick={() => setLocation("/procurement/material-requests")}
-          >
-            <CardContent className="p-3.5 flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-purple-500/10 text-purple-600 flex items-center justify-center shrink-0">
-                <Package className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-[10px] uppercase font-bold text-muted-foreground block">Materials</span>
-                <span className="text-sm font-bold text-foreground truncate block">Indents & Stock</span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
 
       {/* ── 2. Priority Next Actions Feed ── */}
       {nextActions.length > 0 && (
@@ -479,13 +394,9 @@ export default function Dashboard() {
                     <Progress value={p.progress} className="h-1.5" />
 
                     <div className="flex items-center justify-between text-xs pt-1 border-t">
-                      <span className="text-muted-foreground">{canViewFinancials ? "Budget" : "Location"}</span>
+                      <span className="text-muted-foreground">Budget</span>
                       <span className="font-semibold text-foreground">
-                        {canViewFinancials ? (
-                          <MaskedFinancialValue value={p.budget} />
-                        ) : (
-                          <span>{p.location || "On-site"}</span>
-                        )}
+                        <MaskedFinancialValue value={p.budget} />
                       </span>
                     </div>
 
@@ -541,23 +452,19 @@ export default function Dashboard() {
                     </div>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
                       <span>Progress: <strong className="text-foreground">{ph.progress}%</strong></span>
-                      {!isSiteEngineer && (
-                        <>
-                          <span>•</span>
-                          <span>
-                            Quality:{" "}
-                            <strong
-                              className={
-                                ph.qualityStatus === "clear"
-                                  ? "text-emerald-600 font-semibold"
-                                  : "text-amber-600 font-semibold"
-                              }
-                            >
-                              {ph.openSnagsCount === 0 ? "Zero Snags" : `${ph.openSnagsCount} Snags Open`}
-                            </strong>
-                          </span>
-                        </>
-                      )}
+                      <span>•</span>
+                      <span>
+                        Quality:{" "}
+                        <strong
+                          className={
+                            ph.qualityStatus === "clear"
+                              ? "text-emerald-600 font-semibold"
+                              : "text-amber-600 font-semibold"
+                          }
+                        >
+                          {ph.openSnagsCount === 0 ? "Zero Snags" : `${ph.openSnagsCount} Snags Open`}
+                        </strong>
+                      </span>
                     </div>
                   </div>
 
@@ -794,95 +701,53 @@ export default function Dashboard() {
               </Button>
             </CardContent>
           </Card>
-        ) : isSiteEngineer ? (
+        ) : activeRole === "engineer" ? (
           <Card className="border shadow-sm flex flex-col justify-between">
             <CardHeader className="pb-3 border-b bg-muted/10">
               <CardTitle className="text-base font-bold flex items-center gap-2">
-                <HardHat className="h-4 w-4 text-primary" />
-                Site Field Operations Center
+                <Layers className="h-4 w-4 text-emerald-600" />
+                Site Execution & JMR
               </CardTitle>
               <CardDescription className="text-xs">
-                Field measurements, daily logs, and site progress tracking.
+                Physical progress and certified site measurements.
               </CardDescription>
             </CardHeader>
-            <CardContent className="p-4 space-y-3">
-              <div className="space-y-1">
-                <span className="text-xs font-semibold text-foreground block">Today's Field Execution Checklist:</span>
+            <CardContent className="p-4 space-y-4">
+              <div className="space-y-2">
+                <span className="text-xs text-muted-foreground block font-medium">Measurement Records</span>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Record muster roll attendance, submit shift progress (DPR), and document contractor work measurements.
+                  Record joint measurement sheets (JMR) with client representatives and verify contractor progress items.
                 </p>
               </div>
 
-              <div className="space-y-2 pt-1">
-                <div
-                  onClick={() => setLocation("/site-execution?tab=daily-reports")}
-                  className="flex items-center justify-between p-2.5 rounded-lg border bg-muted/20 hover:bg-muted/40 transition-colors cursor-pointer text-xs"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <CalendarIcon className="h-4 w-4 text-amber-500" />
-                    <div>
-                      <div className="font-semibold text-foreground">Daily Progress Report (DPR)</div>
-                      <div className="text-[10px] text-muted-foreground">Log shift output & site photos</div>
-                    </div>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              <div className="p-3 bg-emerald-500/10 rounded-lg border border-emerald-500/20 space-y-1">
+                <div className="flex items-center justify-between text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+                  <span>Snag Clearance</span>
+                  <span>100% Target</span>
                 </div>
+                <p className="text-[11px] text-emerald-600 dark:text-emerald-400">
+                  Resolve pending quality punch items before stage advance.
+                </p>
+              </div>
 
-                <div
-                  onClick={() => setLocation("/site-execution?tab=attendance")}
-                  className="flex items-center justify-between p-2.5 rounded-lg border bg-muted/20 hover:bg-muted/40 transition-colors cursor-pointer text-xs"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <Users className="h-4 w-4 text-blue-500" />
-                    <div>
-                      <div className="font-semibold text-foreground">Site Attendance & Manpower</div>
-                      <div className="text-[10px] text-muted-foreground">Track contractor workers on site</div>
-                    </div>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                </div>
-
-                <div
+              <div className="space-y-2 pt-2">
+                <Button
+                  size="sm"
+                  className="w-full text-xs font-semibold gap-1"
                   onClick={() => setLocation("/ra-bills?tab=work-completions")}
-                  className="flex items-center justify-between p-2.5 rounded-lg border bg-muted/20 hover:bg-muted/40 transition-colors cursor-pointer text-xs"
                 >
-                  <div className="flex items-center gap-2.5">
-                    <Layers className="h-4 w-4 text-emerald-500" />
-                    <div>
-                      <div className="font-semibold text-foreground">Joint Measurements (JMR)</div>
-                      <div className="text-[10px] text-muted-foreground">Verify physical contractor quantities</div>
-                    </div>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                </div>
-
-                <div
+                  <Layers className="h-3.5 w-3.5 mr-1" />
+                  View Joint Measurements (JMR)
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-xs font-semibold gap-1"
                   onClick={() => setLocation("/procurement/material-requests/new")}
-                  className="flex items-center justify-between p-2.5 rounded-lg border bg-muted/20 hover:bg-muted/40 transition-colors cursor-pointer text-xs"
                 >
-                  <div className="flex items-center gap-2.5">
-                    <ShoppingCart className="h-4 w-4 text-purple-500" />
-                    <div>
-                      <div className="font-semibold text-foreground">Material Requisition (Indent)</div>
-                      <div className="text-[10px] text-muted-foreground">Request materials for ongoing tasks</div>
-                    </div>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                </div>
-
-                <div
-                  onClick={() => setLocation("/site-execution?tab=delays")}
-                  className="flex items-center justify-between p-2.5 rounded-lg border bg-muted/20 hover:bg-muted/40 transition-colors cursor-pointer text-xs"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <AlertCircle className="h-4 w-4 text-amber-500" />
-                    <div>
-                      <div className="font-semibold text-foreground">Site Issues & Delays</div>
-                      <div className="text-[10px] text-muted-foreground">Log site hindrances & schedule bottlenecks</div>
-                    </div>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                </div>
+                  <ShoppingCart className="h-3.5 w-3.5 mr-1" />
+                  Raise Material Requisition
+                </Button>
               </div>
             </CardContent>
           </Card>

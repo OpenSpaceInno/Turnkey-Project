@@ -453,6 +453,19 @@ router.get("/dashboard/summary", async (req, res): Promise<void> => {
     });
   }
 
+  // Check 4: Site Execution & Measurements (For Site Engineers)
+  if (me.activeRole === "engineer") {
+    nextActions.push({
+      id: "site-execution-log",
+      priority: "medium",
+      category: "Execution",
+      title: "Log Daily Site Progress & Contractor Measurements (JMR)",
+      description: "Record physical execution and verified quantities against project milestones.",
+      actionText: "Record Progress",
+      actionUrl: "/projects",
+    });
+  }
+
   // Project Health overview (Budget health hidden for non-financial roles)
   const punchListCounts = await db
     .select({

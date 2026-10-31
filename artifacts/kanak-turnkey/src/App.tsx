@@ -180,12 +180,20 @@ function AppContent() {
         </Route>
         <Route path="/site-execution" component={SiteExecutionPage} />
 
-        {/* Quality & Safety Module - Restricted from Site Engineer */}
-        <ProtectedRoute path="/quality-safety/inspections" component={() => <Redirect to="/quality-safety?tab=inspections" />} roles={["admin", "project_manager"]} />
-        <ProtectedRoute path="/quality-safety/snag-list" component={() => <Redirect to="/quality-safety?tab=snag-list" />} roles={["admin", "project_manager"]} />
-        <ProtectedRoute path="/quality-safety/safety-logs" component={() => <Redirect to="/quality-safety?tab=safety-logs" />} roles={["admin", "project_manager"]} />
-        <ProtectedRoute path="/quality-safety/test-reports" component={() => <Redirect to="/quality-safety?tab=test-reports" />} roles={["admin", "project_manager"]} />
-        <ProtectedRoute path="/quality-safety" component={QualitySafetyPage} roles={["admin", "project_manager"]} />
+        {/* Quality & Safety Module */}
+        <Route path="/quality-safety/inspections">
+          {() => <Redirect to="/quality-safety?tab=inspections" />}
+        </Route>
+        <Route path="/quality-safety/snag-list">
+          {() => <Redirect to="/quality-safety?tab=snag-list" />}
+        </Route>
+        <Route path="/quality-safety/safety-logs">
+          {() => <Redirect to="/quality-safety?tab=safety-logs" />}
+        </Route>
+        <Route path="/quality-safety/test-reports">
+          {() => <Redirect to="/quality-safety?tab=test-reports" />}
+        </Route>
+        <Route path="/quality-safety" component={QualitySafetyPage} />
 
         {/* RA Bills & Work Completion Workflow Routes */}
         <Route path="/contracts/new" component={ContractsPage} />

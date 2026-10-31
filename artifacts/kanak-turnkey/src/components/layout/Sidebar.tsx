@@ -55,36 +55,34 @@ export function Sidebar() {
   const currentFullPath = search ? `${location}?${search}` : location;
   const { user, activeRole, isAdmin, hasPermission, hasAnyPermission } = usePermissions();
 
-  const isSiteEngineer = activeRole === "engineer" || activeRole === "site_engineer";
-
   const [procurementExpanded, setProcurementExpanded] = useState(
     location.startsWith("/procurement")
   );
   const [siteExecutionExpanded, setSiteExecutionExpanded] = useState(
-    location.startsWith("/site-execution") || currentFullPath.includes("tab=work-completions") || isSiteEngineer
+    location.startsWith("/site-execution")
   );
   const [qualitySafetyExpanded, setQualitySafetyExpanded] = useState(
-    !isSiteEngineer && location.startsWith("/quality-safety")
+    location.startsWith("/quality-safety")
   );
   const [billingExpanded, setBillingExpanded] = useState(
-    !isSiteEngineer && (location.startsWith("/ra-bills") || location.startsWith("/finance"))
+    location.startsWith("/ra-bills") || location.startsWith("/finance")
   );
   const [reportsExpanded, setReportsExpanded] = useState(
-    !isSiteEngineer && location.startsWith("/reports")
+    location.startsWith("/reports")
   );
   const [adminExpanded, setAdminExpanded] = useState(
-    !isSiteEngineer && (location.startsWith("/admin") || location.startsWith("/settings") || location.startsWith("/audit-logs"))
+    location.startsWith("/admin") || location.startsWith("/settings") || location.startsWith("/audit-logs")
   );
 
   // Keep accordions expanded when navigating to routes inside them
   useEffect(() => {
     if (location.startsWith("/procurement")) setProcurementExpanded(true);
-    if (location.startsWith("/site-execution") || currentFullPath.includes("tab=work-completions")) setSiteExecutionExpanded(true);
-    if (!isSiteEngineer && location.startsWith("/quality-safety")) setQualitySafetyExpanded(true);
-    if (!isSiteEngineer && (location.startsWith("/ra-bills") || location.startsWith("/finance"))) setBillingExpanded(true);
-    if (!isSiteEngineer && location.startsWith("/reports")) setReportsExpanded(true);
-    if (!isSiteEngineer && (location.startsWith("/admin") || location.startsWith("/settings") || location.startsWith("/audit-logs"))) setAdminExpanded(true);
-  }, [location, currentFullPath, isSiteEngineer]);
+    if (location.startsWith("/site-execution")) setSiteExecutionExpanded(true);
+    if (location.startsWith("/quality-safety")) setQualitySafetyExpanded(true);
+    if (location.startsWith("/ra-bills") || location.startsWith("/finance")) setBillingExpanded(true);
+    if (location.startsWith("/reports")) setReportsExpanded(true);
+    if (location.startsWith("/admin") || location.startsWith("/settings") || location.startsWith("/audit-logs")) setAdminExpanded(true);
+  }, [location]);
 
   // Helper to determine if a submenu item is active based on path & query params
   const isSubmenuItemActive = (itemHref: string) => {
@@ -128,53 +126,52 @@ export function Sidebar() {
 
   // 1. Core Primary Items (Sales & Projects)
   const primaryNav: NavItem[] = [
-    { name: isSiteEngineer ? "Field Dashboard" : "Dashboard", href: "/", icon: LayoutDashboard },
+    { name: "Dashboard", href: "/", icon: LayoutDashboard },
     { name: "Leads & Opportunities", href: "/leads", icon: Users, roles: ["admin", "project_manager"] },
-    { name: isSiteEngineer ? "My Site Projects" : "My Projects", href: "/projects", icon: Briefcase, permission: PERMISSIONS.PROJECT_VIEW },
+    { name: "My Projects", href: "/projects", icon: Briefcase, permission: PERMISSIONS.PROJECT_VIEW },
   ];
 
-  // 2. Procurement & Sourcing Submenu (Site materials & indents for Site Engineer)
+  // 2. Procurement & Sourcing Submenu
   const procurementSubmenu: NavItem[] = [
     { name: "Procurement Hub", href: "/procurement", icon: ShoppingCart, roles: ["admin", "procurement_officer", "project_manager", "accountant"] },
-    { name: isSiteEngineer ? "Material Indents (MR)" : "Material Requests", href: "/procurement/material-requests", icon: ClipboardList, anyPermissions: [PERMISSIONS.PROCUREMENT_CREATE, PERMISSIONS.PROCUREMENT_VIEW] },
+    { name: "Material Requests", href: "/procurement/material-requests", icon: ClipboardList, anyPermissions: [PERMISSIONS.PROCUREMENT_CREATE, PERMISSIONS.PROCUREMENT_VIEW] },
     { name: "Manager Approvals", href: "/procurement/manager-approvals", icon: CheckCircle, permission: PERMISSIONS.PROCUREMENT_APPROVE, roles: ["admin", "project_manager"] },
     { name: "RFQs & Quotations", href: "/procurement/rfqs", icon: FileText, permission: PERMISSIONS.PROCUREMENT_COMMERCIAL_VIEW, roles: ["admin", "procurement_officer"] },
     { name: "Purchase Orders", href: "/procurement?tab=pos", icon: Package, permission: PERMISSIONS.PROCUREMENT_COMMERCIAL_VIEW, roles: ["admin", "procurement_officer", "accountant"] },
-    { name: isSiteEngineer ? "Site Stock & Inventory" : "Site Inventory", href: "/procurement?tab=materials", icon: Package, permission: PERMISSIONS.PROCUREMENT_VIEW },
+    { name: "Site Inventory", href: "/procurement?tab=materials", icon: Package, permission: PERMISSIONS.PROCUREMENT_VIEW },
     { name: "Vendors & Suppliers", href: "/procurement?tab=vendors", icon: Building, permission: PERMISSIONS.PROCUREMENT_VIEW, roles: ["admin", "procurement_officer", "project_manager"] },
   ];
 
   // 3. Site Execution Submenu (Turnkey Operational Workflow Order)
   const siteExecutionSubmenu: NavItem[] = [
     { name: "Execution Overview", href: "/site-execution", icon: Activity, permission: PERMISSIONS.PROJECT_VIEW },
-    { name: "Daily Progress (DPR)", href: "/site-execution?tab=daily-reports", icon: Calendar, permission: PERMISSIONS.PROJECT_VIEW },
     { name: "Site Attendance & Manpower", href: "/site-execution?tab=attendance", icon: Users, permission: PERMISSIONS.PROJECT_VIEW },
-    { name: "Field Measurements (JMR)", href: "/ra-bills?tab=work-completions", icon: Layers, permission: PERMISSIONS.PROJECT_VIEW },
     { name: "Material Consumption & Stock", href: "/site-execution?tab=materials", icon: Package, permission: PERMISSIONS.PROJECT_VIEW },
     { name: "Equipment Tracking", href: "/site-execution?tab=equipment", icon: Truck, permission: PERMISSIONS.PROJECT_VIEW },
+    { name: "Daily Progress (DPR)", href: "/site-execution?tab=daily-reports", icon: Calendar, permission: PERMISSIONS.PROJECT_VIEW },
     { name: "Site Issues & Delays", href: "/site-execution?tab=delays", icon: AlertCircle, permission: PERMISSIONS.PROJECT_VIEW },
   ];
 
-  // 4. Quality & Safety Submenu
+  // 4. Quality & Safety Submenu [NEW MODULE]
   const qualitySafetySubmenu: NavItem[] = [
     { name: "Quality & Safety Hub", href: "/quality-safety", icon: ShieldCheck, permission: PERMISSIONS.PROJECT_VIEW },
-    { name: "Snag List & De-Snagging", href: "/quality-safety?tab=snag-list", icon: AlertTriangle, permission: PERMISSIONS.PROJECT_VIEW },
     { name: "Material QC Inspections", href: "/quality-safety?tab=inspections", icon: ClipboardCheck, anyPermissions: [PERMISSIONS.QUALITY_MANAGE, PERMISSIONS.PROCUREMENT_VIEW] },
+    { name: "Snag List & De-Snagging", href: "/quality-safety?tab=snag-list", icon: AlertTriangle, permission: PERMISSIONS.PROJECT_VIEW },
     { name: "Safety Observations & HSE", href: "/quality-safety?tab=safety-logs", icon: HardHat, permission: PERMISSIONS.PROJECT_VIEW },
     { name: "Lab Test Certificates", href: "/quality-safety?tab=test-reports", icon: FileSpreadsheet, permission: PERMISSIONS.PROJECT_VIEW },
   ];
 
-  // 5. Billing & Payments Submenu (Commercial & Financial Lifecycle - Hidden for Site Engineer)
+  // 5. Billing & Payments Submenu (Unified Turnkey Commercial & Financial Lifecycle)
   const billingSubmenu: NavItem[] = [
     { name: "Commercial & Finance Hub", href: "/finance", icon: DollarSign, roles: ["admin", "accountant"] },
     { name: "Contracts & Scope BOQ", href: "/ra-bills/contracts", icon: Building, roles: ["admin", "project_manager", "accountant"] },
-    { name: "Work Measurements (JMR)", href: "/ra-bills?tab=work-completions", icon: Layers, roles: ["admin", "project_manager", "accountant"] },
+    { name: "Work Measurements (JMR)", href: "/ra-bills?tab=work-completions", icon: Layers, anyPermissions: [PERMISSIONS.EXECUTION_MEASURE_CREATE, PERMISSIONS.EXECUTION_MEASURE_VERIFY] },
     { name: "Client RA Bills", href: "/ra-bills", icon: Receipt, permission: PERMISSIONS.BILLING_VIEW, roles: ["admin", "project_manager", "accountant"] },
     { name: "Client AR (Receivables)", href: "/finance/ar", icon: TrendingUp, roles: ["admin", "accountant"] },
     { name: "Vendor AP (Payables)", href: "/finance/ap", icon: TrendingDown, roles: ["admin", "accountant"] },
   ];
 
-  // 6. Reports & Analytics Submenu (Hidden for Site Engineer)
+  // 6. Reports & Analytics Submenu [NEW MODULE]
   const reportsSubmenu: NavItem[] = [
     { name: "Reports Central Hub", href: "/reports", icon: BarChart3, permission: PERMISSIONS.PROJECT_VIEW },
     { name: "Project Progress & S-Curve", href: "/reports?tab=project-progress", icon: TrendingUp, permission: PERMISSIONS.PROJECT_VIEW },
@@ -185,11 +182,11 @@ export function Sidebar() {
 
   // 7. Documents & Collaboration
   const collaborationNav: NavItem[] = [
-    { name: isSiteEngineer ? "Drawings & Documents" : "Documents & Records", href: "/documents", icon: FolderOpen, permission: PERMISSIONS.DOCUMENT_VIEW },
+    { name: "Documents & Records", href: "/documents", icon: FolderOpen, permission: PERMISSIONS.DOCUMENT_VIEW },
     { name: "Task Plan Templates", href: "/task-templates", icon: LayoutTemplate, permission: PERMISSIONS.TASK_MANAGE, roles: ["admin", "project_manager"] },
   ];
 
-  // 8. Settings & Administration (Hidden for Site Engineer)
+  // 8. Settings & Administration
   const adminSubmenu: NavItem[] = [
     { name: "User Management", href: "/admin", icon: UserCog, permission: PERMISSIONS.ADMIN_ACCESS, roles: ["admin"] },
     { name: "Role Switch Approvals", href: "/admin/role-approvals", icon: CheckCircle, permission: PERMISSIONS.PROJECT_TEAM_MANAGE, roles: ["admin", "project_manager"] },
@@ -208,11 +205,10 @@ export function Sidebar() {
 
   const hasProcurementAccess = visibleProcurementSubmenu.length > 0;
   const hasSiteExecutionAccess = visibleSiteExecutionSubmenu.length > 0;
-  // Strictly hide Quality & Safety, Billing, Reports, and Admin for Site Engineers
-  const hasQualitySafetyAccess = !isSiteEngineer && visibleQualitySafetySubmenu.length > 0;
-  const hasBillingAccess = !isSiteEngineer && visibleBillingSubmenu.length > 0;
-  const hasReportsAccess = !isSiteEngineer && visibleReportsSubmenu.length > 0;
-  const hasAdminAccess = !isSiteEngineer && visibleAdminSubmenu.length > 0;
+  const hasQualitySafetyAccess = visibleQualitySafetySubmenu.length > 0;
+  const hasBillingAccess = visibleBillingSubmenu.length > 0;
+  const hasReportsAccess = visibleReportsSubmenu.length > 0;
+  const hasAdminAccess = visibleAdminSubmenu.length > 0;
 
   return (
     <div className="flex flex-col w-64 border-r bg-sidebar text-sidebar-foreground select-none">
@@ -237,7 +233,7 @@ export function Sidebar() {
         {/* Core Navigation */}
         <div className="space-y-1">
           <div className="text-[11px] font-bold text-sidebar-foreground/50 uppercase tracking-wider mb-2 px-3">
-            {isSiteEngineer ? "Site Operations" : "Operations Lifecycle"}
+            Operations Lifecycle
           </div>
           <nav className="space-y-1">
             {/* 1. Primary items (Dashboard, Leads, Projects) */}
@@ -264,7 +260,7 @@ export function Sidebar() {
               );
             })}
 
-            {/* 2. Procurement & Sourcing Accordion (or Site Materials & Indents for Site Engineer) */}
+            {/* 2. Procurement & Sourcing Accordion */}
             {hasProcurementAccess && (
               <div>
                 <div
@@ -277,12 +273,8 @@ export function Sidebar() {
                   )}
                 >
                   <div className="flex items-center gap-3">
-                    {isSiteEngineer ? (
-                      <Package className="w-4 h-4 text-sidebar-foreground/60 shrink-0" />
-                    ) : (
-                      <ShoppingCart className="w-4 h-4 text-sidebar-foreground/60 shrink-0" />
-                    )}
-                    <span>{isSiteEngineer ? "Site Materials & Indents" : "Procurement & Supply"}</span>
+                    <ShoppingCart className="w-4 h-4 text-sidebar-foreground/60 shrink-0" />
+                    <span>Procurement & Supply</span>
                   </div>
                   {procurementExpanded ? (
                     <ChevronDown className="w-4 h-4 text-sidebar-foreground/60" />
